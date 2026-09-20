@@ -77,8 +77,9 @@
                     </x-ui.button>
                 </form>
 
-                <p class="mt-8 text-center text-xs text-slate-400">
-                    Akses khusus untuk Admin dan Support IOT BINUS.
+                <p class="mt-8 text-center text-sm text-slate-500">
+                    Belum punya akun?
+                    <a href="{{ route('register') }}" class="font-semibold text-brand-600 hover:text-brand-700">Daftar</a>
                 </p>
         </div>
     </div>
