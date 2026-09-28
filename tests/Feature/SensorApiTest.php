@@ -71,6 +71,52 @@ test('history is limited and ordered oldest to newest', function () {
     expect(collect($response->json())->pluck('soil_percent')->all())->toBe([30, 40, 50]);
 });
 
+test('history with after_id only returns newer readings', function () {
+    $readings = SensorData::factory()->count(4)->sequence(
+        ['soil_percent' => 10],
+        ['soil_percent' => 20],
+        ['soil_percent' => 30],
+        ['soil_percent' => 40],
+    )->create();
+
+    $response = $this->getJson('/api/sensor/history?after_id='.$readings[1]->id)->assertOk();
+
+    expect(collect($response->json())->pluck('soil_percent')->all())->toBe([30, 40]);
+
+    $this->getJson('/api/sensor/history?after_id='.$readings[3]->id)
+        ->assertOk()
+        ->assertExactJson([]);
+});
+
+test('index filters readings by date range and paginates newest first', function () {
+    SensorData::factory()->create(['soil_percent' => 11, 'created_at' => '2026-09-01 08:00:00']);
+    SensorData::factory()->create(['soil_percent' => 22, 'created_at' => '2026-09-02 23:59:00']);
+    SensorData::factory()->create(['soil_percent' => 33, 'created_at' => '2026-09-03 00:00:00']);
+
+    $response = $this->getJson('/api/sensor?date_from=2026-09-02&date_to=2026-09-03')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 2);
+
+    expect(collect($response->json('data'))->pluck('soil_percent')->all())->toBe([33, 22]);
+});
+
+test('index filters readings by status', function () {
+    SensorData::factory()->create();
+    SensorData::factory()->soilDry()->create();
+    SensorData::factory()->waterEmpty()->create();
+
+    $this->getJson('/api/sensor?status=dry')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 1)
+        ->assertJsonPath('data.0.is_soil_dry', true);
+});
+
+test('index rejects an end date before the start date', function () {
+    $this->getJson('/api/sensor?date_from=2026-09-05&date_to=2026-09-01')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('date_to');
+});
+
 test('dashboard requires authentication and renders for a logged in user', function () {
     $this->get(route('dashboard'))->assertRedirect(route('login'));
 

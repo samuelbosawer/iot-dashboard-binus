@@ -8,7 +8,7 @@ use Illuminate\Contracts\View\View;
 
 class DashboardController extends Controller
 {
-    private const HISTORY_LIMIT = 20;
+    private const HISTORY_LIMIT = 30;
 
     /**
      * Display the realtime IoT dashboard with the initial server-rendered data.
