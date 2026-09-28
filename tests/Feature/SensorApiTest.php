@@ -30,6 +30,31 @@ test('esp32 can store a reading with a valid api key', function () {
     $this->assertDatabaseHas('sensor_data', ['soil_percent' => 25, 'is_soil_dry' => true, 'pump_status' => true]);
 });
 
+test('esp32 firmware payload is accepted and missing lamp states are derived', function (array $payload, array $expected) {
+    $this->postJson('/api/sensor', $payload, ['x-api-key' => 'binus-iot-2025'])->assertCreated();
+
+    $this->assertDatabaseHas('sensor_data', $expected);
+})->with([
+    'soil dry, watering' => [
+        ['soil_percent' => 20, 'soil_raw' => 2600, 'water_raw' => 900, 'is_water_empty' => false, 'is_soil_dry' => true, 'relay_d23' => true, 'pump_status' => true],
+        ['soil_percent' => 20, 'pump_status' => true, 'lampu1_d25' => true, 'lampu2_d14' => false],
+    ],
+    'water empty' => [
+        ['soil_percent' => 10, 'soil_raw' => 2800, 'water_raw' => 5, 'is_water_empty' => true, 'is_soil_dry' => true, 'relay_d23' => false, 'pump_status' => false],
+        ['soil_percent' => 10, 'pump_status' => false, 'lampu1_d25' => false, 'lampu2_d14' => true],
+    ],
+    'safe' => [
+        ['soil_percent' => 70, 'soil_raw' => 1700, 'water_raw' => 1200, 'is_water_empty' => false, 'is_soil_dry' => false, 'relay_d23' => false, 'pump_status' => false],
+        ['soil_percent' => 70, 'pump_status' => false, 'lampu1_d25' => false, 'lampu2_d14' => false],
+    ],
+]);
+
+test('relay_d23 is used as the real pump state', function () {
+    $this->postJson('/api/sensor', sensorPayload(['relay_d23' => false, 'pump_status' => true]), ['x-api-key' => 'binus-iot-2025'])
+        ->assertCreated()
+        ->assertJsonPath('pump_status', false);
+});
+
 test('storing a reading without an api key is rejected', function () {
     $this->postJson('/api/sensor', sensorPayload())->assertUnauthorized();
     $this->postJson('/api/sensor', sensorPayload(), ['x-api-key' => 'wrong'])->assertUnauthorized();
