@@ -190,6 +190,80 @@
         </div>
     </x-ui.card>
 
+    {{-- CSV dataset download --}}
+    <x-ui.card class="mb-6">
+        <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><i class="fa-solid fa-file-csv text-lg"></i></span>
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-900">Download Dataset CSV</h2>
+                    <p class="text-xs text-slate-400">Pilih data sensor dan rentang tanggal sesuai kebutuhan. Kolom <span class="font-mono">id</span> &amp; <span class="font-mono">waktu</span> selalu disertakan.</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-semibold" id="export-quick-dates">
+                <button type="button" data-quick="today" class="rounded-full border border-slate-200 px-3 py-1.5 text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700">Hari ini</button>
+                <button type="button" data-quick="7" class="rounded-full border border-slate-200 px-3 py-1.5 text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700">7 hari</button>
+                <button type="button" data-quick="30" class="rounded-full border border-slate-200 px-3 py-1.5 text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700">30 hari</button>
+                <button type="button" data-quick="all" class="rounded-full border border-slate-200 px-3 py-1.5 text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700">Semua</button>
+            </div>
+        </div>
+
+        @if ($errors->export->any())
+            <x-ui.alert variant="error" class="mb-4">{{ $errors->export->first() }}</x-ui.alert>
+        @endif
+
+        <form id="export-form" method="GET" action="{{ route('sensor.export') }}">
+            <div class="mb-2 flex items-center justify-between">
+                <x-ui.label value="Jenis data sensor" class="mb-0" />
+                <div class="flex gap-3 text-xs font-semibold">
+                    <button type="button" id="export-select-all" class="text-brand-600 hover:text-brand-700">Pilih semua</button>
+                    <button type="button" id="export-select-none" class="text-slate-500 hover:text-slate-700">Kosongkan</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach ($datasets as $dataset)
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 transition hover:bg-slate-50 has-checked:border-emerald-400 has-checked:bg-emerald-50/60">
+                        <input type="checkbox" name="datasets[]" value="{{ $dataset->value }}" class="mt-0.5 h-4 w-4 accent-emerald-600"
+                            @checked(in_array($dataset->value, old('datasets', array_column($datasets, 'value')), true))>
+                        <span>
+                            <span class="block text-sm font-semibold text-slate-800">{{ $dataset->label() }}</span>
+                            <span class="block font-mono text-xs text-slate-400">{{ $dataset->description() }}</span>
+                        </span>
+                    </label>
+                @endforeach
+            </div>
+
+            <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
+                <div>
+                    <x-ui.label for="export-date-from" value="Dari tanggal" />
+                    <x-ui.input id="export-date-from" type="date" name="date_from" icon="fa-calendar" value="{{ old('date_from') }}" />
+                </div>
+                <div>
+                    <x-ui.label for="export-date-to" value="Sampai tanggal" />
+                    <x-ui.input id="export-date-to" type="date" name="date_to" icon="fa-calendar-check" value="{{ old('date_to') }}" />
+                </div>
+                <div>
+                    <x-ui.label for="export-status" value="Status" />
+                    <select id="export-status" name="status" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none">
+                        <option value="">Semua status</option>
+                        <option value="ok" @selected(old('status') === 'ok')>Aman</option>
+                        <option value="dry" @selected(old('status') === 'dry')>Tanah Kering</option>
+                        <option value="empty" @selected(old('status') === 'empty')>Air Habis</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" id="export-submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
+                        <i class="fa-solid fa-download"></i>
+                        Download CSV
+                    </button>
+                </div>
+            </div>
+
+            <p id="export-summary" class="mt-3 text-xs text-slate-500">Menghitung jumlah data…</p>
+        </form>
+    </x-ui.card>
+
     {{-- History table with date filter --}}
     <x-ui.card padding="p-0" class="overflow-hidden">
         <div class="border-b border-slate-200 px-6 py-4">
@@ -785,9 +859,72 @@
                 $('page-prev').addEventListener('click', () => { page -= 1; loadTable(); });
                 $('page-next').addEventListener('click', () => { page += 1; loadTable(); });
 
+                /* ---------- CSV export ---------- */
+
+                const exportForm = $('export-form');
+                const exportCheckboxes = () => [...exportForm.querySelectorAll('input[name="datasets[]"]')];
+                let exportCountTimer = null;
+
+                /**
+                 * Preview how many rows the download will contain, using the same filters as the CSV.
+                 */
+                const updateExportSummary = () => {
+                    clearTimeout(exportCountTimer);
+                    exportCountTimer = setTimeout(async () => {
+                        const selected = exportCheckboxes().filter((input) => input.checked).length;
+                        $('export-submit').disabled = selected === 0;
+
+                        if (selected === 0) {
+                            setText('export-summary', 'Pilih minimal satu jenis data sensor.');
+                            return;
+                        }
+
+                        const params = new URLSearchParams({ per_page: 5 });
+                        ['date_from', 'date_to', 'status'].forEach((key) => {
+                            const value = exportForm.elements[key].value;
+                            if (value) params.set(key, value);
+                        });
+
+                        try {
+                            const result = await fetchJson(RECORDS_URL + '?' + params);
+                            setText('export-summary', result.meta.total.toLocaleString('id-ID') + ' baris · ' + selected + ' jenis data sensor akan di-download.');
+                        } catch (error) {
+                            const errors = error.body?.errors;
+                            setText('export-summary', errors ? Object.values(errors).flat()[0] : 'Tidak dapat menghitung jumlah data.');
+                        }
+                    }, 300);
+                };
+
+                exportForm.addEventListener('change', updateExportSummary);
+
+                $('export-select-all').addEventListener('click', () => {
+                    exportCheckboxes().forEach((input) => { input.checked = true; });
+                    updateExportSummary();
+                });
+
+                $('export-select-none').addEventListener('click', () => {
+                    exportCheckboxes().forEach((input) => { input.checked = false; });
+                    updateExportSummary();
+                });
+
+                document.querySelectorAll('#export-quick-dates button').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const ranges = {
+                            today: [daysAgo(0), daysAgo(0)],
+                            7: [daysAgo(6), daysAgo(0)],
+                            30: [daysAgo(29), daysAgo(0)],
+                            all: ['', ''],
+                        };
+                        [$('export-date-from').value, $('export-date-to').value] = ranges[button.dataset.quick];
+                        updateExportSummary();
+                    });
+                });
+
                 /* ---------- Boot ---------- */
 
                 $('filter-date-from').max = $('filter-date-to').max = toYmd(new Date());
+                $('export-date-from').max = $('export-date-to').max = toYmd(new Date());
+                updateExportSummary();
                 document.querySelectorAll('#range-buttons button').forEach((button) => {
                     button.addEventListener('click', () => setRange(Number(button.dataset.range)));
                 });

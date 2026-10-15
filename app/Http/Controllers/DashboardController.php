@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\SensorDataset;
 use App\Http\Resources\SensorDataResource;
 use App\Models\SensorData;
 use Illuminate\Contracts\View\View;
@@ -26,6 +27,7 @@ class DashboardController extends Controller
             'latest' => $history->isNotEmpty() ? SensorDataResource::make($history->last())->resolve() : null,
             'history' => SensorDataResource::collection($history)->resolve(),
             'historyLimit' => self::HISTORY_LIMIT,
+            'datasets' => SensorDataset::cases(),
         ]);
     }
 }

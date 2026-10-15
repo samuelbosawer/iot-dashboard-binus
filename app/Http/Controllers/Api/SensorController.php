@@ -10,7 +10,6 @@ use App\Models\SensorData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Carbon;
 
 class SensorController extends Controller
 {
@@ -25,14 +24,8 @@ class SensorController extends Controller
      */
     public function index(FilterSensorDataRequest $request): AnonymousResourceCollection
     {
-        $status = $request->validated('status');
-
         $readings = SensorData::query()
-            ->when($request->validated('date_from'), fn ($query, string $date) => $query->where('created_at', '>=', Carbon::parse($date)->startOfDay()))
-            ->when($request->validated('date_to'), fn ($query, string $date) => $query->where('created_at', '<', Carbon::parse($date)->addDay()->startOfDay()))
-            ->when($status === 'empty', fn ($query) => $query->where('is_water_empty', true))
-            ->when($status === 'dry', fn ($query) => $query->where('is_water_empty', false)->where('is_soil_dry', true))
-            ->when($status === 'ok', fn ($query) => $query->where('is_water_empty', false)->where('is_soil_dry', false))
+            ->filter($request->validated())
             ->latest('id')
             ->paginate((int) $request->validated('per_page', self::DEFAULT_PER_PAGE))
             ->withQueryString();
