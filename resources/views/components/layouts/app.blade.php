@@ -28,6 +28,25 @@
                             Dashboard
                         </a>
 
+                        <a href="{{ route('dashboard') }}#dht" class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-slate-600 transition hover:bg-slate-100">
+                            <i class="fa-solid fa-temperature-half"></i>
+                            Sensor DHT
+                        </a>
+
+                        <a href="{{ route('dashboard.prediction') }}" @class([
+                            'inline-flex items-center gap-2 rounded-lg px-3 py-2 transition',
+                            'bg-brand-50 text-brand-700' => request()->routeIs('dashboard.prediction'),
+                            'text-slate-600 hover:bg-slate-100' => ! request()->routeIs('dashboard.prediction'),
+                        ])>
+                            <i class="fa-solid fa-brain"></i>
+                            Prediksi ML
+                        </a>
+
+                        <a href="{{ route('visitor') }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-slate-600 transition hover:bg-slate-100">
+                            <i class="fa-solid fa-earth-asia"></i>
+                            Halaman Visitor
+                        </a>
+
                         @can('manage-users')
                             <a href="{{ route('users.index') }}" @class([
                                 'inline-flex items-center gap-2 rounded-lg px-3 py-2 transition',

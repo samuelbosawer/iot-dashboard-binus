@@ -8,7 +8,7 @@
             <div>
                 <p class="text-xs font-semibold tracking-widest text-brand-200 uppercase">Smart Irrigation · ESP32</p>
                 <h1 class="mt-1 text-2xl font-bold sm:text-3xl">IoT Penyiram Tanaman Binus</h1>
-                <p class="mt-1 text-sm text-brand-100">Monitoring Soil &amp; Water secara realtime</p>
+                <p class="mt-1 text-sm text-brand-100">Monitoring Soil, Water &amp; Udara (DHT) secara realtime</p>
             </div>
 
             <div class="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium ring-1 ring-white/20 backdrop-blur">
@@ -85,24 +85,25 @@
         <x-ui.card>
             <div class="flex items-start justify-between gap-3">
                 <div class="flex items-center gap-3">
-                    <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-600"><i class="fa-solid fa-water"></i></span>
+                    <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-50 text-sky-600"><i class="fa-solid fa-water"></i></span>
                     <div>
-                        <p class="text-sm font-semibold text-slate-900">Sensor Level Air</p>
-                        <p class="text-xs text-slate-400">Tandon air · Pin D33</p>
+                        <p class="text-sm font-semibold text-slate-900">Water Level Float Switch</p>
+                        <p class="text-xs text-slate-400">Pelampung tandon · Pin D33 (digital)</p>
                     </div>
                 </div>
                 <span id="water-badge" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">--</span>
             </div>
 
-            <div class="mt-5 flex items-end justify-between gap-4">
-                <div>
-                    <p id="water-raw" class="text-4xl font-bold text-slate-900">--</p>
-                    <p class="text-xs text-slate-400">Nilai raw ADC (0 – 4095)</p>
+            <div class="mt-5 flex items-center gap-5">
+                {{-- Tank: the float rides on the water surface --}}
+                <div class="relative h-24 w-20 shrink-0 overflow-hidden rounded-b-2xl rounded-t-md border-2 border-slate-300 bg-slate-50">
+                    <div id="water-fill" class="absolute inset-x-0 bottom-0 h-0 bg-sky-400/70 transition-all duration-700"></div>
+                    <div id="water-float" class="absolute left-1/2 bottom-0 h-3 w-8 -translate-x-1/2 rounded-full bg-amber-400 shadow ring-2 ring-white transition-all duration-700"></div>
                 </div>
-                <p class="text-2xl font-bold text-violet-600"><span id="water-percent">--</span><span class="text-base text-slate-400">%</span></p>
-            </div>
-            <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                <div id="water-bar" class="h-full w-0 rounded-full bg-violet-500 transition-all duration-700"></div>
+                <div>
+                    <p id="water-state" class="text-3xl font-bold text-slate-400">--</p>
+                    <p id="water-text" class="mt-1 text-xs text-slate-400">Menunggu data</p>
+                </div>
             </div>
         </x-ui.card>
 
@@ -128,6 +129,61 @@
                     <p class="text-xs text-slate-400">aktif di data terakhir</p>
                 </div>
             </div>
+        </x-ui.card>
+    </div>
+
+    {{-- Row 2b: DHT air temperature + humidity --}}
+    <div id="dht" class="mb-4 grid scroll-mt-6 grid-cols-1 gap-4 md:grid-cols-2">
+        <x-ui.card>
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-500"><i class="fa-solid fa-temperature-half"></i></span>
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900">Suhu Udara</p>
+                        <p class="text-xs text-slate-400">Sensor DHT · Pin D4</p>
+                    </div>
+                </div>
+                <span id="temp-badge" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">--</span>
+            </div>
+
+            <div class="mt-5 flex items-end justify-between gap-4">
+                <p class="text-4xl font-bold text-slate-900"><span id="temp-value">--</span><span class="text-lg text-slate-400">°C</span></p>
+                <dl class="grid grid-cols-3 gap-4 text-right text-xs">
+                    <div><dt class="text-slate-400">Min</dt><dd class="text-base font-bold text-slate-900"><span id="temp-min">--</span>°</dd></div>
+                    <div><dt class="text-slate-400">Rata-rata</dt><dd class="text-base font-bold text-slate-900"><span id="temp-avg">--</span>°</dd></div>
+                    <div><dt class="text-slate-400">Maks</dt><dd class="text-base font-bold text-slate-900"><span id="temp-max">--</span>°</dd></div>
+                </dl>
+            </div>
+            <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                <div id="temp-bar" class="h-full w-0 rounded-full bg-linear-to-r from-amber-300 to-orange-500 transition-all duration-700"></div>
+            </div>
+            <p class="mt-1 flex justify-between text-[10px] text-slate-400"><span>0°C</span><span>50°C</span></p>
+        </x-ui.card>
+
+        <x-ui.card>
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600"><i class="fa-solid fa-droplet"></i></span>
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900">Kelembaban Udara</p>
+                        <p class="text-xs text-slate-400">Sensor DHT · Pin D4</p>
+                    </div>
+                </div>
+                <span id="hum-badge" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">--</span>
+            </div>
+
+            <div class="mt-5 flex items-end justify-between gap-4">
+                <p class="text-4xl font-bold text-slate-900"><span id="hum-value">--</span><span class="text-lg text-slate-400">%</span></p>
+                <dl class="grid grid-cols-3 gap-4 text-right text-xs">
+                    <div><dt class="text-slate-400">Min</dt><dd class="text-base font-bold text-slate-900"><span id="hum-min">--</span>%</dd></div>
+                    <div><dt class="text-slate-400">Rata-rata</dt><dd class="text-base font-bold text-slate-900"><span id="hum-avg">--</span>%</dd></div>
+                    <div><dt class="text-slate-400">Maks</dt><dd class="text-base font-bold text-slate-900"><span id="hum-max">--</span>%</dd></div>
+                </dl>
+            </div>
+            <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                <div id="hum-bar" class="h-full w-0 rounded-full bg-cyan-500 transition-all duration-700"></div>
+            </div>
+            <p class="mt-1 flex justify-between text-[10px] text-slate-400"><span>0%</span><span>100%</span></p>
         </x-ui.card>
     </div>
 
@@ -173,7 +229,7 @@
         <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
             <div>
                 <h2 class="text-lg font-semibold text-slate-900">Grafik Sensor Realtime</h2>
-                <p class="text-xs text-slate-400">Kelembaban tanah &amp; level air (%), area hijau = pompa menyala. Klik legenda untuk menyembunyikan.</p>
+                <p class="text-xs text-slate-400">Kelembaban tanah (%), area merah = air tandon habis (float switch), area hijau = pompa menyala. Klik legenda untuk menyembunyikan.</p>
             </div>
 
             <div class="inline-flex rounded-lg bg-slate-100 p-1 text-xs font-semibold" id="range-buttons">
@@ -187,6 +243,18 @@
 
         <div class="relative h-80 sm:h-112">
             <canvas id="sensor-chart"></canvas>
+        </div>
+    </x-ui.card>
+
+    {{-- DHT chart --}}
+    <x-ui.card class="mb-6">
+        <div class="mb-5">
+            <h2 class="text-lg font-semibold text-slate-900">Grafik Suhu &amp; Kelembaban Udara</h2>
+            <p class="text-xs text-slate-400">Sensor DHT (D4), mengikuti rentang data grafik di atas. Celah pada garis = sensor DHT gagal dibaca.</p>
+        </div>
+
+        <div class="relative h-72">
+            <canvas id="dht-chart"></canvas>
         </div>
     </x-ui.card>
 
@@ -316,7 +384,9 @@
                         <th class="px-6 py-3 font-medium">Waktu</th>
                         <th class="px-4 py-3 font-medium">Tanah %</th>
                         <th class="px-4 py-3 font-medium">Soil Raw</th>
-                        <th class="px-4 py-3 font-medium">Water Raw</th>
+                        <th class="px-4 py-3 font-medium">Air Tandon</th>
+                        <th class="px-4 py-3 font-medium">Suhu</th>
+                        <th class="px-4 py-3 font-medium">Udara %</th>
                         <th class="px-4 py-3 font-medium">Pompa</th>
                         <th class="px-4 py-3 font-medium">D25</th>
                         <th class="px-4 py-3 font-medium">D14</th>
@@ -352,15 +422,17 @@
                 const REFRESH_MS = 1500;
                 const REQUEST_TIMEOUT_MS = 5000;
                 const STALE_AFTER_MS = 60000;
-                const ADC_MAX = 4095;
                 const GAUGE_CIRCUMFERENCE = 326.73;
 
                 const COLORS = {
                     soil: '#2563eb',
-                    water: '#7c3aed',
+                    waterEmpty: 'rgba(239, 68, 68, 0.12)',
+                    waterEmptySolid: '#ef4444',
                     pump: 'rgba(16, 185, 129, 0.14)',
                     pumpSolid: '#10b981',
                     dry: '#f59e0b',
+                    temperature: '#f97316',
+                    humidity: '#06b6d4',
                 };
 
                 const PILL = 'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ';
@@ -397,7 +469,25 @@
                 const setClass = (id, classes) => { $(id).className = classes; };
                 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
                 const statusKey = (d) => (d.is_water_empty ? 'empty' : d.is_soil_dry ? 'dry' : 'ok');
-                const waterPercent = (d) => Math.round(clamp((d.water_raw / ADC_MAX) * 100, 0, 100));
+                // The float switch is on/off only, so the tank drawing shows "full enough" or "empty".
+                const waterLevel = (d) => (d.is_water_empty ? 8 : 75);
+                const formatDecimal = (value) => Number(value).toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                const hasDht = (d) => d.temperature !== null && d.humidity !== null;
+
+                const TEMPERATURE_LEVELS = [
+                    { max: 20, label: 'Sejuk', badge: 'bg-brand-100 text-brand-700' },
+                    { max: 30, label: 'Normal', badge: 'bg-emerald-100 text-emerald-700' },
+                    { max: 35, label: 'Hangat', badge: 'bg-amber-100 text-amber-700' },
+                    { max: Infinity, label: 'Panas', badge: 'bg-red-100 text-red-700' },
+                ];
+
+                const HUMIDITY_LEVELS = [
+                    { max: 40, label: 'Udara Kering', badge: 'bg-amber-100 text-amber-700' },
+                    { max: 70, label: 'Ideal', badge: 'bg-emerald-100 text-emerald-700' },
+                    { max: Infinity, label: 'Udara Lembab', badge: 'bg-brand-100 text-brand-700' },
+                ];
+
+                const levelOf = (levels, value) => levels.find((level) => value <= level.max);
 
                 const formatAgo = (ms) => {
                     const seconds = Math.max(Math.round(ms / 1000), 0);
@@ -465,12 +555,13 @@
                     $('soil-gauge').style.strokeDashoffset = GAUGE_CIRCUMFERENCE * (1 - clamp(d.soil_percent, 0, 100) / 100);
                     $('soil-gauge').setAttribute('class', 'transition-all duration-700 ' + (d.is_soil_dry ? 'stroke-amber-500' : 'stroke-brand-500'));
 
-                    setText('water-raw', d.water_raw);
-                    setText('water-percent', waterPercent(d));
+                    setText('water-state', d.is_water_empty ? 'HABIS' : 'ADA');
+                    setClass('water-state', 'text-3xl font-bold ' + (d.is_water_empty ? 'text-red-600' : 'text-sky-600'));
+                    setText('water-text', d.is_water_empty ? 'Pelampung turun, tandon perlu diisi' : 'Pelampung naik, air tandon tersedia');
                     setText('water-badge', d.is_water_empty ? 'Air Habis' : 'Air Tersedia');
                     setClass('water-badge', PILL + (d.is_water_empty ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'));
-                    $('water-bar').style.width = waterPercent(d) + '%';
-                    setClass('water-bar', 'h-full rounded-full transition-all duration-700 ' + (d.is_water_empty ? 'bg-red-500' : 'bg-violet-500'));
+                    $('water-fill').style.height = waterLevel(d) + '%';
+                    $('water-float').style.bottom = 'calc(' + waterLevel(d) + '% - 6px)';
 
                     setText('pump-status', d.pump_status ? 'ON' : 'OFF');
                     setClass('pump-status', 'text-4xl font-bold ' + (d.pump_status ? 'text-emerald-600' : 'text-slate-400'));
@@ -481,16 +572,53 @@
 
                     renderLamp('lamp-d25', d.lampu1_d25, 'bg-amber-400 text-white shadow-lg shadow-amber-400/50');
                     renderLamp('lamp-d14', d.lampu2_d14, 'bg-red-500 text-white shadow-lg shadow-red-500/50');
+
+                    renderDht(d);
+                };
+
+                const renderDht = (d) => {
+                    if (!hasDht(d)) {
+                        setText('temp-badge', 'DHT Error');
+                        setClass('temp-badge', PILL + 'bg-red-100 text-red-700');
+                        setText('hum-badge', 'DHT Error');
+                        setClass('hum-badge', PILL + 'bg-red-100 text-red-700');
+                        return;
+                    }
+
+                    const temperature = levelOf(TEMPERATURE_LEVELS, d.temperature);
+                    setText('temp-value', formatDecimal(d.temperature));
+                    setText('temp-badge', temperature.label);
+                    setClass('temp-badge', PILL + temperature.badge);
+                    $('temp-bar').style.width = clamp((d.temperature / 50) * 100, 0, 100) + '%';
+
+                    const humidity = levelOf(HUMIDITY_LEVELS, d.humidity);
+                    setText('hum-value', Math.round(d.humidity));
+                    setText('hum-badge', humidity.label);
+                    setClass('hum-badge', PILL + humidity.badge);
+                    $('hum-bar').style.width = clamp(d.humidity, 0, 100) + '%';
                 };
 
                 const renderStats = (rows) => {
                     const values = rows.map((d) => d.soil_percent);
                     const hasData = values.length > 0;
+                    const average = (list) => list.reduce((a, b) => a + b, 0) / list.length;
 
                     setText('stat-min', hasData ? Math.min(...values) : '--');
                     setText('stat-max', hasData ? Math.max(...values) : '--');
-                    setText('stat-avg', hasData ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : '--');
+                    setText('stat-avg', hasData ? Math.round(average(values)) : '--');
                     setText('pump-ratio', hasData ? Math.round((rows.filter((d) => d.pump_status).length / rows.length) * 100) : '--');
+
+                    const dhtRows = rows.filter(hasDht);
+                    const temperatures = dhtRows.map((d) => d.temperature);
+                    const humidities = dhtRows.map((d) => d.humidity);
+                    const hasDhtData = dhtRows.length > 0;
+
+                    setText('temp-min', hasDhtData ? formatDecimal(Math.min(...temperatures)) : '--');
+                    setText('temp-avg', hasDhtData ? formatDecimal(average(temperatures)) : '--');
+                    setText('temp-max', hasDhtData ? formatDecimal(Math.max(...temperatures)) : '--');
+                    setText('hum-min', hasDhtData ? Math.round(Math.min(...humidities)) : '--');
+                    setText('hum-avg', hasDhtData ? Math.round(average(humidities)) : '--');
+                    setText('hum-max', hasDhtData ? Math.round(Math.max(...humidities)) : '--');
                 };
 
                 const setLive = (state, label) => {
@@ -555,18 +683,13 @@
                                 order: 1,
                             },
                             {
-                                type: 'line',
-                                label: 'Level air',
+                                type: 'bar',
+                                label: 'Air habis',
                                 data: [],
-                                borderColor: COLORS.water,
-                                backgroundColor: areaGradient(COLORS.water, '1f'),
-                                borderWidth: 2,
-                                borderDash: [6, 4],
-                                fill: true,
-                                tension: 0.4,
-                                pointRadius: 0,
-                                pointHoverRadius: 5,
-                                pointBackgroundColor: COLORS.water,
+                                backgroundColor: COLORS.waterEmpty,
+                                borderWidth: 0,
+                                barPercentage: 1,
+                                categoryPercentage: 1,
                                 order: 2,
                             },
                             {
@@ -613,7 +736,10 @@
                                 callbacks: {
                                     title: (items) => rows[items[0].dataIndex]?.created_at_label ?? '',
                                     label: (item) => {
-                                        if (item.dataset.type === 'bar') {
+                                        if (item.datasetIndex === 1) {
+                                            return 'Air tandon: ' + (rows[item.dataIndex]?.is_water_empty ? 'HABIS' : 'ADA');
+                                        }
+                                        if (item.datasetIndex === 2) {
                                             return 'Pompa: ' + (rows[item.dataIndex]?.pump_status ? 'ON' : 'OFF');
                                         }
                                         return item.dataset.label + ': ' + item.parsed.y + '%';
@@ -628,10 +754,85 @@
                     },
                 });
 
+                const dhtChart = new Chart($('dht-chart'), {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: 'Suhu (°C)',
+                                data: [],
+                                borderColor: COLORS.temperature,
+                                backgroundColor: areaGradient(COLORS.temperature, '33'),
+                                borderWidth: 2.5,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 5,
+                                yAxisID: 'temperature',
+                            },
+                            {
+                                label: 'Kelembaban udara (%)',
+                                data: [],
+                                borderColor: COLORS.humidity,
+                                backgroundColor: COLORS.humidity,
+                                borderWidth: 2,
+                                borderDash: [6, 4],
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 5,
+                                yAxisID: 'humidity',
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 400 },
+                        interaction: { mode: 'index', intersect: false },
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                border: { color: '#e2e8f0' },
+                                ticks: { color: '#94a3b8', maxTicksLimit: 10, maxRotation: 0 },
+                            },
+                            temperature: {
+                                position: 'left',
+                                suggestedMin: 15,
+                                suggestedMax: 40,
+                                border: { display: false },
+                                grid: { color: '#f1f5f9' },
+                                ticks: { color: COLORS.temperature, callback: (v) => v + '°C' },
+                            },
+                            humidity: {
+                                position: 'right',
+                                min: 0,
+                                max: 100,
+                                border: { display: false },
+                                grid: { display: false },
+                                ticks: { color: COLORS.humidity, stepSize: 25, callback: (v) => v + '%' },
+                            },
+                        },
+                        plugins: {
+                            legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, color: '#475569' } },
+                            tooltip: {
+                                backgroundColor: '#0f172a',
+                                padding: 12,
+                                cornerRadius: 10,
+                                usePointStyle: true,
+                                callbacks: {
+                                    title: (items) => rows[items[0].dataIndex]?.created_at_label ?? '',
+                                    label: (item) => item.parsed.y === null ? item.dataset.label + ': --' : item.dataset.label + ': ' + formatDecimal(item.parsed.y),
+                                },
+                            },
+                        },
+                    },
+                });
+
                 const renderLegend = () => {
                     const items = [
                         { index: 0, label: 'Kelembaban tanah', swatch: '<span class="h-0.5 w-4 rounded-full" style="background:' + COLORS.soil + '"></span>' },
-                        { index: 1, label: 'Level air', swatch: '<span class="w-4 border-t-2 border-dashed" style="border-color:' + COLORS.water + '"></span>' },
+                        { index: 1, label: 'Air habis', swatch: '<span class="h-3 w-3 rounded-sm" style="background:' + COLORS.waterEmptySolid + '"></span>' },
                         { index: 2, label: 'Pompa ON', swatch: '<span class="h-3 w-3 rounded-sm" style="background:' + COLORS.pumpSolid + '"></span>' },
                     ];
 
@@ -659,9 +860,14 @@
                     chart.data.labels = rows.map((d) => d.time_label);
                     chart.data.datasets[0].data = rows.map((d) => d.soil_percent);
                     chart.data.datasets[0].pointRadius = rows.map((d) => (d.is_soil_dry ? 4 : 0));
-                    chart.data.datasets[1].data = rows.map(waterPercent);
+                    chart.data.datasets[1].data = rows.map((d) => (d.is_water_empty ? 100 : null));
                     chart.data.datasets[2].data = rows.map((d) => (d.pump_status ? 100 : null));
                     chart.update();
+
+                    dhtChart.data.labels = rows.map((d) => d.time_label);
+                    dhtChart.data.datasets[0].data = rows.map((d) => d.temperature);
+                    dhtChart.data.datasets[1].data = rows.map((d) => d.humidity);
+                    dhtChart.update();
                 };
 
                 /* ---------- Live polling ---------- */
@@ -759,7 +965,9 @@
                             cell(d.created_at_label, 'whitespace-nowrap px-6 py-3 text-slate-600'),
                             cell(d.soil_percent + '%', 'px-4 py-3 font-semibold text-slate-900'),
                             cell(d.soil_raw),
-                            cell(d.water_raw),
+                            cell(d.is_water_empty ? 'Habis' : 'Ada', 'px-4 py-3 font-medium ' + (d.is_water_empty ? 'text-red-600' : 'text-sky-700')),
+                            cell(d.temperature === null ? '--' : formatDecimal(d.temperature) + ' °C'),
+                            cell(d.humidity === null ? '--' : formatDecimal(d.humidity) + '%'),
                             onOffCell(d.pump_status),
                             onOffCell(d.lampu1_d25),
                             onOffCell(d.lampu2_d14),

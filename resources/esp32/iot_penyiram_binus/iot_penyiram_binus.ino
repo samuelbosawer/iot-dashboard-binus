@@ -5,7 +5,8 @@
  *
  * Pin:
  *   Soil Moisture Capacitive : D34 (ADC)
- *   Water Level              : D33 (ADC)
+ *   Water Level Float Switch : D33 (digital, INPUT_PULLUP)
+ *                              kabel 1 -> D33, kabel 2 -> GND (tidak perlu resistor)
  *   Pompa Air                : D23
  *   Lampu Indikator 1        : D25 (tanah kering / sedang menyiram)
  *   Lampu Indikator 2        : D14 (air tandon habis)
@@ -35,7 +36,12 @@ const int SOIL_RAW_DRY = 3200;        // nilai raw saat sensor di udara (0%)
 const int SOIL_RAW_WET = 1300;        // nilai raw saat sensor di air (100%)
 const int SOIL_DRY_ON_PERCENT  = 30;  // di bawah ini dianggap kering -> siram
 const int SOIL_DRY_OFF_PERCENT = 45;  // di atas ini pompa berhenti (histeresis)
-const int WATER_EMPTY_RAW = 500;      // di bawah ini dianggap air habis
+
+// Float switch: true jika kontak TERTUTUP (D33 = LOW) saat pelampung NAIK / air ada.
+// Jika di dashboard terbalik (air ada tapi tertulis HABIS), ubah ke false
+// atau balik posisi pelampung pada batangnya.
+const bool FLOAT_CLOSED_WHEN_WATER = true;
+const unsigned long FLOAT_DEBOUNCE_MS = 1000;  // status harus stabil 1 detik (air bergelombang)
 // ===============================================
 
 // Pin
@@ -58,6 +64,26 @@ bool oledReady = false;
 unsigned long lastSendMs = 0;
 bool pumpOn = false;
 int lastHttpCode = 0;
+
+bool waterEmptyStable = true;       // anggap habis sampai float switch terbaca stabil
+bool waterEmptyCandidate = true;
+unsigned long waterCandidateSinceMs = 0;
+
+// Baca float switch dengan debounce agar gelombang air tidak membuat status berkedip.
+bool readWaterEmpty() {
+  bool contactClosed = digitalRead(PIN_WATER) == LOW;
+  bool waterPresent  = FLOAT_CLOSED_WHEN_WATER ? contactClosed : !contactClosed;
+  bool emptyNow      = !waterPresent;
+
+  if (emptyNow != waterEmptyCandidate) {
+    waterEmptyCandidate = emptyNow;
+    waterCandidateSinceMs = millis();
+  } else if (emptyNow != waterEmptyStable && millis() - waterCandidateSinceMs >= FLOAT_DEBOUNCE_MS) {
+    waterEmptyStable = emptyNow;
+  }
+
+  return waterEmptyStable;
+}
 
 int readAverage(int pin, int samples = 10) {
   long total = 0;
@@ -89,7 +115,7 @@ void connectWiFi() {
   }
 }
 
-void drawOled(int soilPercent, int waterRaw, bool waterEmpty, bool soilDry, bool pump) {
+void drawOled(int soilPercent, bool waterEmpty, bool soilDry, bool pump) {
   if (!oledReady) return;
 
   display.clearDisplay();
@@ -103,7 +129,7 @@ void drawOled(int soilPercent, int waterRaw, bool waterEmpty, bool soilDry, bool
   display.printf("Tanah : %d %%", soilPercent);
 
   display.setCursor(0, 24);
-  display.printf("Air   : %d", waterRaw);
+  display.printf("Air   : %s", waterEmpty ? "HABIS" : "ADA");
 
   display.setCursor(0, 34);
   display.printf("Pompa : %s", pump ? "ON" : "OFF");
@@ -124,7 +150,7 @@ void drawOled(int soilPercent, int waterRaw, bool waterEmpty, bool soilDry, bool
   display.display();
 }
 
-void sendToServer(int soilPercent, int soilRaw, int waterRaw, bool waterEmpty,
+void sendToServer(int soilPercent, int soilRaw, bool waterEmpty,
                   bool soilDry, bool pump, bool lampu1, bool lampu2) {
   if (WiFi.status() != WL_CONNECTED) {
     lastHttpCode = 0;
@@ -134,7 +160,6 @@ void sendToServer(int soilPercent, int soilRaw, int waterRaw, bool waterEmpty,
   JsonDocument doc;
   doc["soil_percent"]   = soilPercent;
   doc["soil_raw"]       = soilRaw;
-  doc["water_raw"]      = waterRaw;
   doc["is_water_empty"] = waterEmpty;
   doc["is_soil_dry"]    = soilDry;
   doc["pump_status"]    = pump;
@@ -172,6 +197,7 @@ void setup() {
   pinMode(PIN_LAMPU1, OUTPUT);
   pinMode(PIN_LAMPU2, OUTPUT);
   pinMode(PIN_BUZZER, OUTPUT);
+  pinMode(PIN_WATER, INPUT_PULLUP);  // float switch ke GND, pull-up internal
   digitalWrite(PIN_PUMP, LOW);
   digitalWrite(PIN_LAMPU1, LOW);
   digitalWrite(PIN_LAMPU2, LOW);
@@ -201,10 +227,9 @@ void loop() {
   }
 
   int soilRaw   = readAverage(PIN_SOIL);
-  int waterRaw  = readAverage(PIN_WATER);
   int soilPercent = constrain(map(soilRaw, SOIL_RAW_DRY, SOIL_RAW_WET, 0, 100), 0, 100);
 
-  bool waterEmpty = waterRaw < WATER_EMPTY_RAW;
+  bool waterEmpty = readWaterEmpty();
   bool soilDry    = soilPercent < SOIL_DRY_ON_PERCENT;
 
   // Pompa menyala saat tanah kering & air ada; mati saat tanah cukup basah / air habis
@@ -228,9 +253,9 @@ void loop() {
 
   if (millis() - lastSendMs >= SEND_INTERVAL_MS) {
     lastSendMs = millis();
-    sendToServer(soilPercent, soilRaw, waterRaw, waterEmpty, soilDry, pumpOn, lampu1, lampu2);
+    sendToServer(soilPercent, soilRaw, waterEmpty, soilDry, pumpOn, lampu1, lampu2);
   }
 
-  drawOled(soilPercent, waterRaw, waterEmpty, soilDry, pumpOn);
+  drawOled(soilPercent, waterEmpty, soilDry, pumpOn);
   delay(100);
 }

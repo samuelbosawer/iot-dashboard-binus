@@ -31,7 +31,7 @@ class SensorExportController extends Controller
                 fputcsv($handle, [
                     $reading->id,
                     $reading->created_at?->format('Y-m-d H:i:s'),
-                    ...array_map(fn (callable $value): int|string => $value($reading), array_values($columns)),
+                    ...array_map(fn (callable $value): int|float|string|null => $value($reading), array_values($columns)),
                 ]);
             });
 

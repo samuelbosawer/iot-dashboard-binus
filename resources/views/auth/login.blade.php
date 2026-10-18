@@ -81,6 +81,11 @@
                     Belum punya akun?
                     <a href="{{ route('register') }}" class="font-semibold text-brand-600 hover:text-brand-700">Daftar</a>
                 </p>
+
+                <a href="{{ route('visitor') }}" class="mt-4 flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                    <i class="fa-solid fa-earth-asia"></i>
+                    Lihat data sebagai Visitor
+                </a>
         </div>
     </div>
 </x-layouts.guest>

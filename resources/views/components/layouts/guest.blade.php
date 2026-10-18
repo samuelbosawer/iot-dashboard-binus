@@ -13,5 +13,7 @@
 </head>
 <body class="h-full bg-slate-50 font-sans antialiased">
     {{ $slot }}
+
+    @stack('scripts')
 </body>
 </html>

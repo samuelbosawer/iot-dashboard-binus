@@ -20,13 +20,26 @@ class SensorDataFactory extends Factory
         return [
             'soil_percent' => fake()->numberBetween(40, 90),
             'soil_raw' => fake()->numberBetween(1200, 2400),
-            'water_raw' => fake()->numberBetween(1500, 3500),
+            'water_raw' => null,
+            'temperature' => fake()->randomFloat(1, 24, 34),
+            'humidity' => fake()->randomFloat(1, 50, 90),
             'is_water_empty' => false,
             'is_soil_dry' => false,
             'pump_status' => false,
             'lampu1_d25' => false,
             'lampu2_d14' => false,
         ];
+    }
+
+    /**
+     * Indicate that the DHT sensor failed to read, so no air temperature or humidity was stored.
+     */
+    public function withoutDht(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'temperature' => null,
+            'humidity' => null,
+        ]);
     }
 
     /**
@@ -49,7 +62,6 @@ class SensorDataFactory extends Factory
     public function waterEmpty(): static
     {
         return $this->state(fn (array $attributes) => [
-            'water_raw' => fake()->numberBetween(0, 300),
             'is_water_empty' => true,
             'pump_status' => false,
             'lampu2_d14' => true,

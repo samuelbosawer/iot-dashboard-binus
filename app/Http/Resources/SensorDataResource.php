@@ -23,6 +23,8 @@ class SensorDataResource extends JsonResource
             'soil_percent' => $this->soil_percent,
             'soil_raw' => $this->soil_raw,
             'water_raw' => $this->water_raw,
+            'temperature' => $this->temperature,
+            'humidity' => $this->humidity,
             'is_water_empty' => $this->is_water_empty,
             'is_soil_dry' => $this->is_soil_dry,
             'pump_status' => $this->pump_status,

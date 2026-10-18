@@ -20,9 +20,14 @@ class StoreSensorDataRequest extends FormRequest
     /**
      * Fill in the fields the ESP32 sketch does not send, using the same logic as the firmware:
      * the D23 relay is the real pump state, D25 lights while watering and D14 lights when the tank is empty.
+     * A failed DHT read (sent as 0 °C and 0 % by older firmware) is stored as "no reading" instead of fake zeros.
      */
     protected function prepareForValidation(): void
     {
+        if ((float) $this->input('temperature') === 0.0 && (float) $this->input('humidity') === 0.0) {
+            $this->merge(['temperature' => null, 'humidity' => null]);
+        }
+
         $isWaterEmpty = $this->boolean('is_water_empty');
         $isSoilDry = $this->boolean('is_soil_dry');
 
@@ -49,7 +54,9 @@ class StoreSensorDataRequest extends FormRequest
         return [
             'soil_percent' => ['required', 'integer', 'between:0,100'],
             'soil_raw' => ['required', 'integer', 'between:0,65535'],
-            'water_raw' => ['required', 'integer', 'between:0,65535'],
+            'water_raw' => ['nullable', 'integer', 'between:0,65535'],
+            'temperature' => ['nullable', 'numeric', 'between:-40,80'],
+            'humidity' => ['nullable', 'numeric', 'between:0,100'],
             'is_water_empty' => ['required', 'boolean'],
             'is_soil_dry' => ['required', 'boolean'],
             'pump_status' => ['required', 'boolean'],

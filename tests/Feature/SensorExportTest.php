@@ -48,7 +48,7 @@ test('csv only contains the selected datasets within the date range, oldest firs
 
 test('csv can be filtered by status and keeps the canonical column order', function () {
     SensorData::factory()->create();
-    SensorData::factory()->waterEmpty()->create(['water_raw' => 0]);
+    SensorData::factory()->waterEmpty()->create();
 
     $response = $this->actingAs(User::factory()->create())
         ->get(route('sensor.export', ['datasets' => ['lamp_d14', 'water'], 'status' => 'empty']))
@@ -56,9 +56,9 @@ test('csv can be filtered by status and keeps the canonical column order', funct
 
     $rows = csvRows($response->streamedContent());
 
-    expect($rows[0])->toBe(['id', 'waktu', 'water_raw', 'water_percent', 'air_habis', 'lampu_d14'])
+    expect($rows[0])->toBe(['id', 'waktu', 'status_air', 'air_habis', 'lampu_d14'])
         ->and($rows)->toHaveCount(2)
-        ->and(array_slice($rows[1], 2))->toBe(['0', '0', '1', '1']);
+        ->and(array_slice($rows[1], 2))->toBe(['Habis', '1', '1']);
 });
 
 test('export requires at least one valid dataset and a valid date range', function () {
@@ -85,4 +85,19 @@ test('dashboard shows the dataset download form', function () {
         ->assertOk()
         ->assertSee('Download Dataset CSV')
         ->assertSee('Kelembaban Tanah (D34)');
+});
+
+test('csv can include dht air temperature and humidity', function () {
+    SensorData::factory()->create(['temperature' => 28.5, 'humidity' => 65]);
+    SensorData::factory()->withoutDht()->create();
+
+    $response = $this->actingAs(User::factory()->create())
+        ->get(route('sensor.export', ['datasets' => ['climate']]))
+        ->assertOk();
+
+    $rows = csvRows($response->streamedContent());
+
+    expect($rows[0])->toBe(['id', 'waktu', 'suhu_c', 'kelembaban_udara'])
+        ->and(array_slice($rows[1], 2))->toBe(['28.5', '65'])
+        ->and(array_slice($rows[2], 2))->toBe(['', '']);
 });

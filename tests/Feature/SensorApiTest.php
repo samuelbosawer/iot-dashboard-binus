@@ -65,7 +65,18 @@ test('storing a reading without an api key is rejected', function () {
 test('invalid payloads return json validation errors even without an accept header', function () {
     $response = $this->post('/api/sensor', ['soil_percent' => 500], ['x-api-key' => 'binus-iot-2025']);
 
-    $response->assertStatus(422)->assertJsonValidationErrors(['soil_percent', 'soil_raw', 'water_raw']);
+    $response->assertStatus(422)->assertJsonValidationErrors(['soil_percent', 'soil_raw', 'is_water_empty']);
+});
+
+test('float switch firmware can send a reading without water_raw', function () {
+    $payload = sensorPayload(['is_water_empty' => true, 'is_soil_dry' => false, 'pump_status' => false]);
+    unset($payload['water_raw'], $payload['lampu1_d25'], $payload['lampu2_d14']);
+
+    $this->postJson('/api/sensor', $payload, ['x-api-key' => 'binus-iot-2025'])
+        ->assertCreated()
+        ->assertJsonPath('water_raw', null)
+        ->assertJsonPath('is_water_empty', true)
+        ->assertJsonPath('lampu2_d14', true);
 });
 
 test('latest returns the newest reading', function () {
@@ -158,4 +169,30 @@ test('the default admin can log in after seeding', function () {
 
     $this->post(route('login'), ['email' => 'admin@binus.ac.id', 'password' => 'binus123'])
         ->assertRedirect(route('dashboard'));
+});
+
+test('esp32 can store dht air temperature and humidity', function () {
+    $this->postJson('/api/sensor', sensorPayload(['temperature' => 29.4, 'humidity' => 71]), ['x-api-key' => 'binus-iot-2025'])
+        ->assertCreated()
+        ->assertJsonPath('temperature', 29.4)
+        ->assertJsonPath('humidity', 71);
+
+    $this->assertDatabaseHas('sensor_data', ['temperature' => 29.4, 'humidity' => 71]);
+});
+
+test('a failed dht read sent as zeros is stored without temperature and humidity', function () {
+    $this->postJson('/api/sensor', sensorPayload(['temperature' => 0, 'humidity' => 0]), ['x-api-key' => 'binus-iot-2025'])
+        ->assertCreated()
+        ->assertJsonPath('temperature', null)
+        ->assertJsonPath('humidity', null);
+});
+
+test('readings without dht values are still accepted and impossible dht values are rejected', function () {
+    $this->postJson('/api/sensor', sensorPayload(), ['x-api-key' => 'binus-iot-2025'])
+        ->assertCreated()
+        ->assertJsonPath('temperature', null);
+
+    $this->postJson('/api/sensor', sensorPayload(['temperature' => 120, 'humidity' => 140]), ['x-api-key' => 'binus-iot-2025'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['temperature', 'humidity']);
 });

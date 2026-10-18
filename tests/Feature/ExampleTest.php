@@ -1,7 +1,13 @@
 <?php
 
-test('guests are redirected to the login screen', function () {
-    $response = $this->get('/');
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-    $response->assertRedirect(route('login'));
+uses(RefreshDatabase::class);
+
+test('the visitor page is the home page', function () {
+    $this->get('/')->assertOk()->assertSee('Data Sensor Live');
+});
+
+test('the old visitor url redirects to the home page', function () {
+    $this->get('/visitor')->assertRedirect('/')->assertStatus(301);
 });

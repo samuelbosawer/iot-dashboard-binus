@@ -21,3 +21,62 @@
     --color-brand-800: #1e40af;
     --color-brand-900: #1e3a8a;
 }
+
+/* Visitor page animations */
+@theme {
+    --animate-float: float 7s ease-in-out infinite;
+    --animate-rise: rise 7s linear infinite;
+    --animate-sway: sway 4s ease-in-out infinite;
+    --animate-wave: wave 5s linear infinite;
+    --animate-shimmer: shimmer 2.5s linear infinite;
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-24px) scale(1.05); }
+    }
+
+    @keyframes rise {
+        0% { transform: translateY(0); opacity: 0; }
+        15% { opacity: 0.8; }
+        100% { transform: translateY(-320px); opacity: 0; }
+    }
+
+    @keyframes sway {
+        0%, 100% { transform: rotate(-6deg); }
+        50% { transform: rotate(6deg); }
+    }
+
+    @keyframes wave {
+        from { transform: translateX(0); }
+        to { transform: translateX(-50%); }
+    }
+
+    @keyframes shimmer {
+        from { background-position: -200% 0; }
+        to { background-position: 200% 0; }
+    }
+}
+
+/* Fade-up when a section scrolls into view (toggled by the visitor page script). */
+.reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.reveal.is-visible {
+    opacity: 1;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .reveal {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+
+    .motion-safe-only {
+        animation: none !important;
+    }
+}
