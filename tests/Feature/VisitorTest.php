@@ -12,7 +12,9 @@ test('guests can open the visitor page without logging in', function () {
         ->assertSee('Data Sensor Live')
         ->assertSee('Laporan Umum')
         ->assertSee('Download Data CSV')
-        ->assertSee('Suhu &amp; Kelembaban Udara (DHT D4)', false)
+        ->assertSee('Suhu &amp; Kelembaban Udara (DHT)', false)
+        ->assertDontSee('Pin D')
+        ->assertDontSee('DHT D4')
         ->assertSee('Belum ada data sensor pada periode ini.');
 });
 

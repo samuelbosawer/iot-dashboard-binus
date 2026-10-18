@@ -7,7 +7,7 @@
         <div class="relative flex flex-wrap items-start justify-between gap-4">
             <div>
                 <p class="text-xs font-semibold tracking-widest text-brand-200 uppercase">Smart Irrigation · ESP32</p>
-                <h1 class="mt-1 text-2xl font-bold sm:text-3xl">IoT Penyiram Tanaman Binus</h1>
+                <h1 class="mt-1 text-2xl font-bold sm:text-3xl">IoT Penyiram Tanaman</h1>
                 <p class="mt-1 text-sm text-brand-100">Monitoring Soil, Water &amp; Udara (DHT) secara realtime</p>
             </div>
 
@@ -88,7 +88,7 @@
                     <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-50 text-sky-600"><i class="fa-solid fa-water"></i></span>
                     <div>
                         <p class="text-sm font-semibold text-slate-900">Water Level Float Switch</p>
-                        <p class="text-xs text-slate-400">Pelampung tandon · Pin D33 (digital)</p>
+                        <p class="text-xs text-slate-400">Pelampung tandon · Pin D15 (LOW = air habis)</p>
                     </div>
                 </div>
                 <span id="water-badge" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">--</span>
@@ -194,7 +194,7 @@
                 <span id="lamp-d25-icon" class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xl text-slate-400 transition"><i class="fa-solid fa-lightbulb"></i></span>
                 <div class="min-w-0 flex-1">
                     <p class="text-sm font-semibold text-slate-900">Lampu Indikator 1</p>
-                    <p class="text-xs text-slate-400">Pin D25 · Tanah kering / menyiram</p>
+                    <p class="text-xs text-slate-400">Pin D25 · Menyala saat Siram ON</p>
                 </div>
                 <span id="lamp-d25-state" class="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-500">--</span>
             </div>
@@ -205,7 +205,7 @@
                 <span id="lamp-d14-icon" class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xl text-slate-400 transition"><i class="fa-solid fa-lightbulb"></i></span>
                 <div class="min-w-0 flex-1">
                     <p class="text-sm font-semibold text-slate-900">Lampu Indikator 2</p>
-                    <p class="text-xs text-slate-400">Pin D14 · Air tandon habis</p>
+                    <p class="text-xs text-slate-400">Pin D14 · Menyala + buzzer saat air habis</p>
                 </div>
                 <span id="lamp-d14-state" class="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-500">--</span>
             </div>
@@ -295,7 +295,12 @@
                         <input type="checkbox" name="datasets[]" value="{{ $dataset->value }}" class="mt-0.5 h-4 w-4 accent-emerald-600"
                             @checked(in_array($dataset->value, old('datasets', array_column($datasets, 'value')), true))>
                         <span>
-                            <span class="block text-sm font-semibold text-slate-800">{{ $dataset->label() }}</span>
+                            <span class="block text-sm font-semibold text-slate-800">
+                                {{ $dataset->label() }}
+                                @if ($dataset->pin())
+                                    <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-medium text-slate-500">Pin {{ $dataset->pin() }}</span>
+                                @endif
+                            </span>
                             <span class="block font-mono text-xs text-slate-400">{{ $dataset->description() }}</span>
                         </span>
                     </label>
@@ -315,8 +320,8 @@
                     <x-ui.label for="export-status" value="Status" />
                     <select id="export-status" name="status" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none">
                         <option value="">Semua status</option>
-                        <option value="ok" @selected(old('status') === 'ok')>Aman</option>
-                        <option value="dry" @selected(old('status') === 'dry')>Tanah Kering</option>
+                        <option value="ok" @selected(old('status') === 'ok')>Aman - Basah</option>
+                        <option value="dry" @selected(old('status') === 'dry')>Siram ON (tanah kering)</option>
                         <option value="empty" @selected(old('status') === 'empty')>Air Habis</option>
                     </select>
                 </div>
@@ -361,8 +366,8 @@
                     <x-ui.label for="filter-status" value="Status" />
                     <select id="filter-status" name="status" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none">
                         <option value="">Semua status</option>
-                        <option value="ok">Aman</option>
-                        <option value="dry">Tanah Kering</option>
+                        <option value="ok">Aman - Basah</option>
+                        <option value="dry">Siram ON (tanah kering)</option>
                         <option value="empty">Air Habis</option>
                     </select>
                 </div>
@@ -445,21 +450,21 @@
                         icon: 'bg-red-500 text-white',
                         iconClass: 'fa-triangle-exclamation',
                         label: 'ALERT: Air Habis',
-                        text: 'Air tandon habis. Lampu D14 menyala dan pompa tidak dapat menyiram.',
+                        text: 'Float switch D15 mendeteksi air habis. Pompa D23 dikunci OFF, lampu D14 & buzzer menyala.',
                         badge: 'bg-red-100 text-red-700',
                     },
                     dry: {
                         icon: 'bg-amber-400 text-white',
                         iconClass: 'fa-seedling',
-                        label: 'Tanah Kering',
-                        text: 'Tanah kering. Lampu D25 menyala dan penyiraman sedang berlangsung.',
+                        label: 'Siram ON',
+                        text: 'Tanah kering (< 30%) dan air tersedia. Pompa D23 menyiram, lampu D25 menyala.',
                         badge: 'bg-amber-100 text-amber-700',
                     },
                     ok: {
                         icon: 'bg-emerald-500 text-white',
                         iconClass: 'fa-circle-check',
-                        label: 'Aman',
-                        text: 'Kelembaban tanah dan level air dalam kondisi baik.',
+                        label: 'Aman - Basah',
+                        text: 'Tanah cukup basah (≥ 30%) dan air tersedia. Pompa D23 mati.',
                         badge: 'bg-emerald-100 text-emerald-700',
                     },
                 };
@@ -550,7 +555,7 @@
 
                     setText('soil-percent', d.soil_percent);
                     setText('soil-raw', d.soil_raw);
-                    setText('soil-badge', d.is_soil_dry ? 'Tanah Kering' : 'Tanah Lembab');
+                    setText('soil-badge', d.is_soil_dry ? 'Kering (< 30%)' : 'Basah (≥ 30%)');
                     setClass('soil-badge', 'mt-3 ' + PILL + (d.is_soil_dry ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'));
                     $('soil-gauge').style.strokeDashoffset = GAUGE_CIRCUMFERENCE * (1 - clamp(d.soil_percent, 0, 100) / 100);
                     $('soil-gauge').setAttribute('class', 'transition-all duration-700 ' + (d.is_soil_dry ? 'stroke-amber-500' : 'stroke-brand-500'));
@@ -565,8 +570,10 @@
 
                     setText('pump-status', d.pump_status ? 'ON' : 'OFF');
                     setClass('pump-status', 'text-4xl font-bold ' + (d.pump_status ? 'text-emerald-600' : 'text-slate-400'));
-                    setText('pump-text', d.pump_status ? 'Sedang menyiram tanaman' : 'Pompa tidak aktif');
-                    setText('pump-badge', d.pump_status ? 'Menyiram' : 'Standby');
+                    setText('pump-text', d.pump_status
+                        ? 'Menyiram: air ada & tanah < 30%'
+                        : d.is_water_empty ? 'Dikunci OFF karena air habis' : 'Mati, tanah cukup basah');
+                    setText('pump-badge', d.pump_status ? 'Menyiram' : d.is_water_empty ? 'Terkunci' : 'Standby');
                     setClass('pump-badge', PILL + (d.pump_status ? 'bg-emerald-100 text-emerald-700' : OFF));
                     setClass('pump-icon', 'flex h-11 w-11 items-center justify-center rounded-xl transition ' + (d.pump_status ? 'animate-pulse bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'));
 

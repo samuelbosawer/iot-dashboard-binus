@@ -32,3 +32,33 @@ test('the admin dashboard has a prediction menu that requires login', function (
 test('the visitor page links to the prediction menu', function () {
     $this->get(route('visitor'))->assertOk()->assertSee(route('prediction'));
 });
+
+test('the prediction chart uses real hourly data and projects the soil trend', function () {
+    $this->travelTo(now()->setTime(12, 30));
+
+    foreach ([5, 4, 3, 2, 1, 0] as $index => $hoursAgo) {
+        SensorData::factory()->create(['soil_percent' => 70 - $index * 5, 'created_at' => now()->subHours($hoursAgo)]);
+    }
+
+    $response = $this->get(route('prediction'))->assertOk();
+    $trend = $response->viewData('trend');
+    $hourly = $response->viewData('hourly');
+
+    expect($hourly)->toHaveCount(48)
+        ->and(end($hourly)['avg_soil'])->toBe(45.0)
+        ->and($trend['available'])->toBeTrue()
+        ->and($trend['slope'])->toBe(-5.0)
+        ->and($trend['hours_until_dry'])->toBe(3.0)
+        ->and($trend['projection'])->toHaveCount(6);
+
+    $response->assertSee('Tanah segera mengering')->assertSee('prediction-chart');
+});
+
+test('recommendations warn when the tank is empty and dht data is missing', function () {
+    SensorData::factory()->waterEmpty()->withoutDht()->create();
+
+    $titles = collect($this->get(route('prediction'))->viewData('recommendations'))->pluck('title');
+
+    expect($titles)->toContain('Isi tandon sekarang', 'Data suhu belum masuk', 'Lanjutkan pengumpulan data')
+        ->not->toContain('Kondisi stabil');
+});

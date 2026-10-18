@@ -15,10 +15,10 @@
 
 <div {{ $attributes->merge(['class' => 'flex items-center gap-3']) }}>
     <span class="flex {{ $sizes['box'] }} items-center justify-center rounded-xl bg-linear-to-br from-brand-500 to-brand-700 text-white shadow-md shadow-brand-600/20">
-        <i class="fa-solid fa-satellite-dish {{ $sizes['icon'] }}"></i>
+        <i class="fa-solid fa-seedling {{ $sizes['icon'] }}"></i>
     </span>
     <div class="leading-tight">
-        <p class="{{ $sizes['title'] }} font-bold {{ $colors['title'] }}">IOT <span class="{{ $colors['accent'] }}">BINUS</span></p>
-        <p class="text-xs font-medium {{ $colors['subtitle'] }}">Sensor Dashboard</p>
+        <p class="{{ $sizes['title'] }} font-bold {{ $colors['title'] }}">Taman <span class="{{ $colors['accent'] }}">Pintar</span></p>
+        <p class="text-xs font-medium {{ $colors['subtitle'] }}">IoT Smart Irrigation</p>
     </div>
 </div>

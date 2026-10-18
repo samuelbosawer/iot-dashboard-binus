@@ -1,10 +1,20 @@
-@props(['dataset', 'models', 'downloadUrl'])
+@props(['dataset', 'models', 'hourly', 'trend', 'recommendations', 'soilDryPercent', 'downloadUrl'])
 
 @php
     $tones = [
         'brand' => ['icon' => 'bg-brand-50 text-brand-600', 'bar' => 'bg-brand-500'],
         'sky' => ['icon' => 'bg-sky-50 text-sky-600', 'bar' => 'bg-sky-500'],
     ];
+
+    $recommendationTones = [
+        'red' => 'border-red-200 bg-red-50 text-red-600',
+        'amber' => 'border-amber-200 bg-amber-50 text-amber-600',
+        'brand' => 'border-brand-200 bg-brand-50 text-brand-600',
+        'emerald' => 'border-emerald-200 bg-emerald-50 text-emerald-600',
+        'slate' => 'border-slate-200 bg-slate-50 text-slate-500',
+    ];
+
+    $number = fn (float $value): string => number_format($value, 1, ',', '.');
 
     $steps = [
         ['icon' => 'fa-satellite-dish', 'title' => 'Kumpulkan data', 'text' => 'ESP32 mengirim data soil, float switch, DHT, dan pompa secara rutin.'],
@@ -33,12 +43,63 @@
         @endforeach
     </div>
 
+    {{-- Real data chart + recommendations --}}
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-[1.6fr_1fr]">
+        <x-ui.card>
+            <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 class="text-base font-semibold text-slate-900">Grafik Data Real · {{ count($hourly) }} Jam Terakhir</h2>
+                    <p class="text-xs text-slate-400">Rata-rata per jam dari data sensor asli. Garis putus-putus = tren linear 24 jam + proyeksi 6 jam (baseline statistik, bukan model ML).</p>
+                </div>
+                @if ($trend['available'])
+                    <div class="flex gap-4 text-right">
+                        <div>
+                            <p class="text-xs text-slate-400">Tren</p>
+                            <p @class(['text-lg font-bold', 'text-amber-600' => $trend['slope'] < 0, 'text-emerald-600' => $trend['slope'] >= 0])>
+                                {{ $trend['slope'] >= 0 ? '+' : '' }}{{ $number($trend['slope']) }}<span class="text-xs font-medium text-slate-400">%/jam</span>
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400">Kering dalam</p>
+                            <p class="text-lg font-bold text-slate-900">{{ $trend['hours_until_dry'] !== null ? '±'.$number($trend['hours_until_dry']).' jam' : '--' }}</p>
+                        </div>
+                    </div>
+                @endif
+            </div>
+
+            <div class="relative h-80">
+                <canvas id="prediction-chart"></canvas>
+            </div>
+
+            @unless ($trend['available'])
+                <p class="mt-3 text-xs text-slate-400">Tren belum dapat dihitung: dibutuhkan data minimal 3 jam berbeda dalam 24 jam terakhir.</p>
+            @endunless
+        </x-ui.card>
+
+        <x-ui.card>
+            <h2 class="text-base font-semibold text-slate-900">Rekomendasi</h2>
+            <p class="text-xs text-slate-400">Dibuat otomatis dari data sensor terbaru</p>
+
+            <ul class="mt-4 space-y-3">
+                @foreach ($recommendations as $recommendation)
+                    <li class="flex items-start gap-3 rounded-xl border p-3 {{ $recommendationTones[$recommendation['tone']] }}">
+                        <i class="fa-solid {{ $recommendation['icon'] }} mt-0.5"></i>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">{{ $recommendation['title'] }}</p>
+                            <p class="mt-0.5 text-xs text-slate-600">{{ $recommendation['text'] }}</p>
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
+        </x-ui.card>
+    </div>
+
     {{-- Planned models --}}
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         @foreach ($models as $model)
             @php
                 $tone = $tones[$model['tone']];
-                $isReady = collect($model['requirements'])->every(fn (array $requirement): bool => $requirement['current'] >= $requirement['required']);
+                $isReady = $model['ready'];
             @endphp
 
             <x-ui.card class="flex flex-col">
@@ -117,3 +178,92 @@
         </ol>
     </x-ui.card>
 </div>
+
+@push('scripts')
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script>
+        (() => {
+            const hourly = @json($hourly);
+            const trend = @json($trend);
+            const DRY = @json($soilDryPercent);
+            const future = trend.projection.map(() => null);
+
+            new Chart(document.getElementById('prediction-chart'), {
+                data: {
+                    labels: [...hourly.map((h) => h.label), ...trend.projection.map((p) => p.label)],
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'Kelembaban tanah (rata-rata/jam)',
+                            data: [...hourly.map((h) => h.avg_soil), ...future],
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                            borderWidth: 2.5,
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 0,
+                            pointHoverRadius: 5,
+                            order: 1,
+                        },
+                        {
+                            type: 'line',
+                            label: 'Tren & proyeksi',
+                            data: [...trend.line, ...trend.projection.map((p) => p.value)],
+                            borderColor: '#7c3aed',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            order: 2,
+                        },
+                        {
+                            type: 'line',
+                            label: 'Batas kering (' + DRY + '%)',
+                            data: [...hourly, ...trend.projection].map(() => DRY),
+                            borderColor: '#f59e0b',
+                            borderWidth: 1.5,
+                            borderDash: [2, 4],
+                            pointRadius: 0,
+                            pointHoverRadius: 0,
+                            order: 3,
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Air habis (% data)',
+                            data: [...hourly.map((h) => h.empty_percent || null), ...future],
+                            backgroundColor: 'rgba(239, 68, 68, 0.25)',
+                            borderRadius: 4,
+                            order: 4,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8', maxTicksLimit: 9, maxRotation: 0 } },
+                        y: { min: 0, max: 100, border: { display: false }, grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', stepSize: 25, callback: (v) => v + '%' } },
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, color: '#475569' } },
+                        tooltip: {
+                            backgroundColor: '#0f172a',
+                            padding: 12,
+                            cornerRadius: 10,
+                            filter: (item) => item.parsed.y !== null && item.datasetIndex !== 2,
+                            callbacks: {
+                                label: (item) => item.dataset.label + ': ' + item.parsed.y + '%',
+                                afterBody: (items) => {
+                                    const hour = hourly[items[0].dataIndex];
+                                    if (!hour) return ['', 'Proyeksi tren'];
+                                    return hour.total ? ['', hour.total + ' data · pompa aktif ' + hour.pump_percent + '%'] : ['', 'Tidak ada data'];
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+        })();
+    </script>
+@endpush

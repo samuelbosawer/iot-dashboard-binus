@@ -1,4 +1,4 @@
-<x-layouts.guest title="Register">
+<x-layouts.guest title="Register" :noindex="true">
     <div class="flex min-h-screen items-center justify-center bg-linear-to-br from-brand-50 via-white to-brand-100 px-6 py-12">
         <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl shadow-brand-600/10">
             <div class="mb-8 flex justify-center">
@@ -41,7 +41,7 @@
                         name="email"
                         icon="fa-envelope"
                         value="{{ old('email') }}"
-                        placeholder="nama@binus.ac.id"
+                        placeholder="nama@email.com"
                         required
                         autocomplete="username"
                     />

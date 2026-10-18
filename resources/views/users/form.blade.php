@@ -34,7 +34,7 @@
 
                 <div>
                     <x-ui.label for="email" value="Email" />
-                    <x-ui.input id="email" type="email" name="email" icon="fa-envelope" value="{{ old('email', $user->email) }}" placeholder="nama@binus.ac.id" required />
+                    <x-ui.input id="email" type="email" name="email" icon="fa-envelope" value="{{ old('email', $user->email) }}" placeholder="nama@email.com" required />
                     <x-ui.input-error :messages="$errors->get('email')" />
                 </div>
 

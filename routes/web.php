@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\SensorExportController;
+use App\Http\Controllers\SeoController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VisitorController;
 use Illuminate\Support\Facades\Route;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [VisitorController::class, 'index'])->name('visitor');
 Route::permanentRedirect('visitor', '/');
 Route::get('prediksi', [PredictionController::class, 'visitor'])->name('prediction');
+Route::get('robots.txt', [SeoController::class, 'robots'])->name('robots');
+Route::get('sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 Route::get('visitor/export', SensorExportController::class)
     ->middleware('throttle:10,1')
     ->name('visitor.export');

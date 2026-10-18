@@ -5,6 +5,7 @@
         ['href' => $home.'#live', 'label' => 'Live'],
         ['href' => $home.'#laporan', 'label' => 'Laporan'],
         ['href' => $home.'#grafik', 'label' => 'Grafik'],
+        ['href' => $home.'#tabel', 'label' => 'Tabel'],
         ['href' => $home.'#download', 'label' => 'Download'],
     ];
 @endphp

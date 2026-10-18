@@ -12,7 +12,7 @@
     $periodLabels = [1 => 'Hari ini', 7 => '7 hari', 30 => '30 hari'];
 @endphp
 
-<x-layouts.guest title="Visitor">
+<x-layouts.guest title="Monitoring Tanaman Realtime" description="Pantau kelembaban tanah, air tandon, suhu & kelembaban udara, serta aktivitas penyiraman otomatis secara realtime. Lihat laporan, tabel data, grafik, dan download dataset CSV.">
     {{-- Top navigation --}}
     <x-visitor.navbar />
 
@@ -40,7 +40,7 @@
                 </span>
 
                 <h1 class="mt-5 text-4xl font-bold tracking-tight sm:text-5xl">
-                    Taman Pintar <span class="bg-linear-to-r from-emerald-300 via-brand-200 to-emerald-300 bg-[length:200%_100%] bg-clip-text text-transparent motion-safe-only animate-shimmer">IoT Binus</span>
+                    Taman Pintar <span class="bg-linear-to-r from-emerald-300 via-brand-200 to-emerald-300 bg-[length:200%_100%] bg-clip-text text-transparent motion-safe-only animate-shimmer">IoT</span>
                 </h1>
                 <p class="mt-4 max-w-xl text-base text-brand-100 sm:text-lg">
                     Pantau kondisi tanaman secara langsung: kelembaban tanah, level air tandon, suhu &amp; kelembaban udara, serta aktivitas penyiraman otomatis oleh ESP32.
@@ -134,7 +134,7 @@
                         </div>
                         <p class="pb-2 text-4xl font-bold text-slate-900"><span id="v-temp">--</span><span class="text-base text-slate-400">°C</span></p>
                     </div>
-                    <p id="v-temp-label" class="mt-3 text-center text-xs font-semibold text-slate-500">Sensor DHT · Pin D4</p>
+                    <p id="v-temp-label" class="mt-3 text-center text-xs font-semibold text-slate-500">Sensor DHT</p>
                 </x-ui.card>
 
                 {{-- Air humidity --}}
@@ -152,7 +152,7 @@
                             <p class="absolute inset-0 flex items-center justify-center pt-6 text-2xl font-bold text-slate-900"><span id="v-hum">--</span><span class="text-sm">%</span></p>
                         </div>
                     </div>
-                    <p id="v-hum-label" class="mt-3 text-center text-xs font-semibold text-slate-500">Sensor DHT · Pin D4</p>
+                    <p id="v-hum-label" class="mt-3 text-center text-xs font-semibold text-slate-500">Sensor DHT</p>
                 </x-ui.card>
             </div>
 
@@ -222,8 +222,8 @@
 
                     <ul class="mt-5 space-y-3 text-sm">
                         @foreach ([
-                            ['label' => 'Aman', 'count' => $summary['ok'], 'percent' => $summary['ok_percent'], 'dot' => 'bg-emerald-500'],
-                            ['label' => 'Tanah Kering', 'count' => $summary['dry'], 'percent' => $summary['dry_percent'], 'dot' => 'bg-amber-400'],
+                            ['label' => 'Aman - Basah', 'count' => $summary['ok'], 'percent' => $summary['ok_percent'], 'dot' => 'bg-emerald-500'],
+                            ['label' => 'Siram ON', 'count' => $summary['dry'], 'percent' => $summary['dry_percent'], 'dot' => 'bg-amber-400'],
                             ['label' => 'Air Habis', 'count' => $summary['empty'], 'percent' => $summary['empty_percent'], 'dot' => 'bg-red-500'],
                         ] as $status)
                             <li class="flex items-center justify-between">
@@ -275,6 +275,85 @@
                     </div>
                 </x-ui.card>
             </div>
+        </section>
+
+        {{-- Data table --}}
+        <section id="tabel" class="scroll-mt-24">
+            <div class="reveal mb-6 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                    <p class="text-xs font-semibold tracking-widest text-brand-600 uppercase">Data</p>
+                    <h2 class="mt-1 text-2xl font-bold text-slate-900">Tabel Data Sensor</h2>
+                    <p id="v-table-summary" class="text-sm text-slate-500">Memuat data…</p>
+                </div>
+                <div class="flex flex-wrap gap-2 text-xs font-semibold" id="v-table-quick">
+                    <button type="button" data-quick="today" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-600 transition hover:border-brand-300 hover:text-brand-700">Hari ini</button>
+                    <button type="button" data-quick="7" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-600 transition hover:border-brand-300 hover:text-brand-700">7 hari</button>
+                    <button type="button" data-quick="30" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-600 transition hover:border-brand-300 hover:text-brand-700">30 hari</button>
+                    <button type="button" data-quick="all" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-600 transition hover:border-brand-300 hover:text-brand-700">Semua</button>
+                </div>
+            </div>
+
+            <x-ui.card padding="p-0" class="reveal overflow-hidden">
+                <form id="v-table-form" class="grid grid-cols-1 gap-3 border-b border-slate-200 px-6 py-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
+                    <div>
+                        <x-ui.label for="v-table-from" value="Dari tanggal" />
+                        <x-ui.input id="v-table-from" type="date" name="date_from" icon="fa-calendar" />
+                    </div>
+                    <div>
+                        <x-ui.label for="v-table-to" value="Sampai tanggal" />
+                        <x-ui.input id="v-table-to" type="date" name="date_to" icon="fa-calendar-check" />
+                    </div>
+                    <div>
+                        <x-ui.label for="v-table-status" value="Status" />
+                        <select id="v-table-status" name="status" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none">
+                            <option value="">Semua status</option>
+                            <option value="ok">Aman - Basah</option>
+                            <option value="dry">Siram ON</option>
+                            <option value="empty">Air Habis</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <x-ui.button type="submit">
+                            <i class="fa-solid fa-filter"></i>
+                            Terapkan
+                        </x-ui.button>
+                        <x-ui.button type="button" variant="secondary" id="v-table-reset">Reset</x-ui.button>
+                    </div>
+                </form>
+                <p id="v-table-error" class="hidden px-6 pt-3 text-sm text-red-600"></p>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="bg-slate-50 text-xs tracking-wide text-slate-500 uppercase">
+                            <tr>
+                                <th class="px-6 py-3 font-medium">Waktu</th>
+                                <th class="px-4 py-3 font-medium">Kelembaban Tanah</th>
+                                <th class="px-4 py-3 font-medium">Air Tandon</th>
+                                <th class="px-4 py-3 font-medium">Suhu</th>
+                                <th class="px-4 py-3 font-medium">Kelembaban Udara</th>
+                                <th class="px-4 py-3 font-medium">Pompa</th>
+                                <th class="px-4 py-3 font-medium">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="v-table-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+                <p id="v-table-empty" class="hidden px-6 py-10 text-center text-sm text-slate-400">Tidak ada data pada filter ini.</p>
+
+                <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-6 py-4 text-sm">
+                    <p id="v-table-page" class="text-slate-500">-</p>
+                    <div class="flex gap-2">
+                        <x-ui.button variant="secondary" id="v-table-prev" disabled>
+                            <i class="fa-solid fa-chevron-left"></i>
+                            Sebelumnya
+                        </x-ui.button>
+                        <x-ui.button variant="secondary" id="v-table-next" disabled>
+                            Berikutnya
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </x-ui.button>
+                    </div>
+                </div>
+            </x-ui.card>
         </section>
 
         {{-- CSV download --}}
@@ -338,7 +417,7 @@
 
     <footer class="border-t border-slate-200 bg-white">
         <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-slate-400">
-            <p>&copy; {{ now()->year }} IOT BINUS · Smart Irrigation ESP32</p>
+            <p>&copy; {{ now()->year }} Taman Pintar IoT · Smart Irrigation ESP32</p>
             <p>Data diperbarui otomatis setiap beberapa detik.</p>
         </div>
     </footer>
@@ -421,8 +500,8 @@
 
                 const STATUS = {
                     empty: { label: 'Air Habis', live: 'Air tandon habis' },
-                    dry: { label: 'Tanah Kering', live: 'Sedang menyiram' },
-                    ok: { label: 'Kondisi Aman', live: 'Tanaman sehat' },
+                    dry: { label: 'Siram ON', live: 'Sedang menyiram' },
+                    ok: { label: 'Aman - Basah', live: 'Tanaman sehat' },
                 };
                 const statusKey = (d) => (d.is_water_empty ? 'empty' : d.is_soil_dry ? 'dry' : 'ok');
 
@@ -444,11 +523,11 @@
                     if (hasDht(d)) {
                         setText('v-temp', number(d.temperature));
                         $('v-temp-bar').style.height = clamp((d.temperature / 50) * 100, 0, 100) + '%';
-                        setText('v-temp-label', temperatureLabel(d.temperature) + ' · Sensor DHT D4');
+                        setText('v-temp-label', temperatureLabel(d.temperature) + ' · Sensor DHT');
 
                         setText('v-hum', Math.round(d.humidity));
                         $('v-hum-clip').style.clipPath = 'inset(' + (100 - clamp(d.humidity, 0, 100)) + '% 0 0 0)';
-                        setText('v-hum-label', humidityLabel(d.humidity) + ' · Sensor DHT D4');
+                        setText('v-hum-label', humidityLabel(d.humidity) + ' · Sensor DHT');
                     } else {
                         setText('v-temp-label', 'Sensor DHT tidak terbaca');
                         setText('v-hum-label', 'Sensor DHT tidak terbaca');
@@ -583,6 +662,107 @@
                     }
                 };
 
+                /* ---------- Data table ---------- */
+
+                const STATUS_BADGES = {
+                    empty: 'bg-red-100 text-red-700',
+                    dry: 'bg-amber-100 text-amber-700',
+                    ok: 'bg-emerald-100 text-emerald-700',
+                };
+                const tableFilters = { date_from: '', date_to: '', status: '' };
+                let tablePage = 1;
+
+                const tableCell = (text, classes = 'px-4 py-3 text-slate-600') => {
+                    const td = document.createElement('td');
+                    td.className = classes;
+                    td.textContent = text;
+                    return td;
+                };
+
+                const badgeCell = (text, classes) => {
+                    const td = document.createElement('td');
+                    td.className = 'px-4 py-3';
+                    const badge = document.createElement('span');
+                    badge.className = 'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ' + classes;
+                    badge.textContent = text;
+                    td.append(badge);
+                    return td;
+                };
+
+                const loadTable = async () => {
+                    const params = new URLSearchParams({ page: tablePage, per_page: 10 });
+                    Object.entries(tableFilters).forEach(([key, value]) => value && params.set(key, value));
+                    $('v-table-error').classList.add('hidden');
+
+                    try {
+                        const response = await fetch(RECORDS_URL + '?' + params, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(Object.values(result.errors || {}).flat()[0] || 'Gagal memuat data.');
+                        }
+
+                        const meta = result.meta;
+                        $('v-table-body').replaceChildren(...result.data.map((d) => {
+                            const tr = document.createElement('tr');
+                            tr.className = 'hover:bg-slate-50';
+                            tr.append(
+                                tableCell(d.created_at_label, 'whitespace-nowrap px-6 py-3 text-slate-600'),
+                                tableCell(d.soil_percent + '%', 'px-4 py-3 font-semibold text-slate-900'),
+                                badgeCell(d.is_water_empty ? 'Habis' : 'Ada', d.is_water_empty ? 'bg-red-100 text-red-700' : 'bg-sky-100 text-sky-700'),
+                                tableCell(d.temperature === null ? '--' : number(d.temperature) + ' °C'),
+                                tableCell(d.humidity === null ? '--' : Math.round(d.humidity) + '%'),
+                                badgeCell(d.pump_status ? 'ON' : 'OFF', d.pump_status ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'),
+                                badgeCell(STATUS[statusKey(d)].label, STATUS_BADGES[statusKey(d)]),
+                            );
+                            return tr;
+                        }));
+
+                        $('v-table-empty').classList.toggle('hidden', result.data.length > 0);
+                        setText('v-table-summary', meta.total.toLocaleString('id-ID') + ' data ditemukan, terbaru di atas.');
+                        setText('v-table-page', meta.total ? 'Menampilkan ' + meta.from + '–' + meta.to + ' dari ' + meta.total.toLocaleString('id-ID') + ' · Hal. ' + meta.current_page + '/' + meta.last_page : 'Tidak ada data');
+                        $('v-table-prev').disabled = meta.current_page <= 1;
+                        $('v-table-next').disabled = meta.current_page >= meta.last_page;
+                    } catch (error) {
+                        setText('v-table-error', error.message);
+                        $('v-table-error').classList.remove('hidden');
+                    }
+                };
+
+                const applyTableFilters = () => {
+                    tableFilters.date_from = $('v-table-from').value;
+                    tableFilters.date_to = $('v-table-to').value;
+                    tableFilters.status = $('v-table-status').value;
+                    tablePage = 1;
+                    loadTable();
+                };
+
+                $('v-table-form').addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    applyTableFilters();
+                });
+
+                $('v-table-reset').addEventListener('click', () => {
+                    $('v-table-form').reset();
+                    applyTableFilters();
+                });
+
+                document.querySelectorAll('#v-table-quick button').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const ranges = {
+                            today: [daysAgo(0), daysAgo(0)],
+                            7: [daysAgo(6), daysAgo(0)],
+                            30: [daysAgo(29), daysAgo(0)],
+                            all: ['', ''],
+                        };
+                        [$('v-table-from').value, $('v-table-to').value] = ranges[button.dataset.quick];
+                        applyTableFilters();
+                    });
+                });
+
+                $('v-table-prev').addEventListener('click', () => { tablePage -= 1; loadTable(); });
+                $('v-table-next').addEventListener('click', () => { tablePage += 1; loadTable(); });
+
                 /* ---------- CSV export ---------- */
 
                 const exportForm = $('v-export-form');
@@ -635,7 +815,9 @@
                 /* ---------- Boot ---------- */
 
                 $('v-export-from').max = $('v-export-to').max = toYmd(new Date());
+                $('v-table-from').max = $('v-table-to').max = toYmd(new Date());
                 updateExportSummary();
+                loadTable();
                 render();
                 setInterval(poll, REFRESH_MS);
                 document.addEventListener('visibilitychange', () => {

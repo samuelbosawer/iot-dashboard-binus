@@ -43,7 +43,7 @@ test('csv only contains the selected datasets within the date range, oldest firs
         ->and($rows[1][2])->toBe('22')
         ->and($rows[2][2])->toBe('15')
         ->and($rows[2][4])->toBe('1')
-        ->and($rows[2][5])->toBe('Tanah Kering');
+        ->and($rows[2][5])->toBe('Siram ON');
 });
 
 test('csv can be filtered by status and keeps the canonical column order', function () {
@@ -84,7 +84,8 @@ test('dashboard shows the dataset download form', function () {
         ->get(route('dashboard'))
         ->assertOk()
         ->assertSee('Download Dataset CSV')
-        ->assertSee('Kelembaban Tanah (D34)');
+        ->assertSee('Kelembaban Tanah')
+        ->assertSee('Pin D34');
 });
 
 test('csv can include dht air temperature and humidity', function () {

@@ -17,16 +17,35 @@ enum SensorDataset: string
     case LampD14 = 'lamp_d14';
     case Status = 'status';
 
+    /**
+     * Public name of the dataset (without ESP32 pins, safe for the visitor site).
+     */
     public function label(): string
     {
         return match ($this) {
-            self::Soil => 'Kelembaban Tanah (D34)',
-            self::Water => 'Float Switch Level Air (D33)',
-            self::Climate => 'Suhu & Kelembaban Udara (DHT D4)',
-            self::Pump => 'Pompa Air (D23)',
-            self::LampD25 => 'Lampu Indikator 1 (D25)',
-            self::LampD14 => 'Lampu Indikator 2 (D14)',
+            self::Soil => 'Kelembaban Tanah',
+            self::Water => 'Float Switch Air Tandon',
+            self::Climate => 'Suhu & Kelembaban Udara (DHT)',
+            self::Pump => 'Pompa Air',
+            self::LampD25 => 'Lampu Indikator 1',
+            self::LampD14 => 'Lampu Indikator 2',
             self::Status => 'Status Sistem',
+        };
+    }
+
+    /**
+     * ESP32 pin of the sensor/actuator, shown on the admin dashboard only.
+     */
+    public function pin(): ?string
+    {
+        return match ($this) {
+            self::Soil => 'D34',
+            self::Water => 'D15',
+            self::Climate => 'D4',
+            self::Pump => 'D23',
+            self::LampD25 => 'D25',
+            self::LampD14 => 'D14',
+            self::Status => null,
         };
     }
 

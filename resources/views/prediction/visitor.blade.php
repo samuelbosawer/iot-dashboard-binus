@@ -1,4 +1,4 @@
-<x-layouts.guest title="Prediksi ML">
+<x-layouts.guest title="Prediksi Machine Learning" description="Grafik data sensor asli, tren kelembaban tanah, dan rekomendasi perawatan tanaman berdasarkan data kelembaban tanah dan air tandon.">
     <x-visitor.navbar />
 
     <section class="bg-linear-to-br from-brand-600 via-brand-800 to-brand-900 text-white">
@@ -13,6 +13,6 @@
     </section>
 
     <main class="mx-auto max-w-7xl px-6 py-10">
-        <x-prediction.overview :dataset="$dataset" :models="$models" :download-url="route('visitor').'#download'" />
+        <x-prediction.overview :dataset="$dataset" :models="$models" :hourly="$hourly" :trend="$trend" :recommendations="$recommendations" :soil-dry-percent="$soilDryPercent" :download-url="route('visitor').'#download'" />
     </main>
 </x-layouts.guest>

@@ -5,8 +5,8 @@
  *
  * Pin:
  *   Soil Moisture Capacitive : D34 (ADC)
- *   Water Level Float Switch : D33 (digital, INPUT_PULLUP)
- *                              kabel 1 -> D33, kabel 2 -> GND (tidak perlu resistor)
+ *   Water Level Float Switch : D15 (digital, INPUT_PULLUP, LOW = air habis)
+ *                              kabel 1 -> D15, kabel 2 -> GND (tidak perlu resistor)
  *   Pompa Air                : D23
  *   Lampu Indikator 1        : D25 (tanah kering / sedang menyiram)
  *   Lampu Indikator 2        : D14 (air tandon habis)
@@ -40,13 +40,13 @@ const int SOIL_DRY_OFF_PERCENT = 45;  // di atas ini pompa berhenti (histeresis)
 // Float switch: true jika kontak TERTUTUP (D33 = LOW) saat pelampung NAIK / air ada.
 // Jika di dashboard terbalik (air ada tapi tertulis HABIS), ubah ke false
 // atau balik posisi pelampung pada batangnya.
-const bool FLOAT_CLOSED_WHEN_WATER = true;
+const bool FLOAT_CLOSED_WHEN_WATER = false;  // LOW (kontak tertutup) = air habis
 const unsigned long FLOAT_DEBOUNCE_MS = 1000;  // status harus stabil 1 detik (air bergelombang)
 // ===============================================
 
 // Pin
 const int PIN_SOIL   = 34;
-const int PIN_WATER  = 33;
+const int PIN_WATER  = 15;
 const int PIN_PUMP   = 23;
 const int PIN_LAMPU1 = 25;
 const int PIN_LAMPU2 = 14;

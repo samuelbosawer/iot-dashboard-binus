@@ -75,14 +75,15 @@ class SensorData extends Model
     }
 
     /**
-     * Human readable system status, matching the dashboard.
+     * Human readable system status, matching the ESP32 firmware: the pump only runs when the
+     * float switch reports water AND the soil is below 30 %.
      */
     public function statusLabel(): string
     {
         return match (true) {
             $this->is_water_empty => 'Air Habis',
-            $this->is_soil_dry => 'Tanah Kering',
-            default => 'Aman',
+            $this->is_soil_dry => 'Siram ON',
+            default => 'Aman - Basah',
         };
     }
 }

@@ -161,7 +161,8 @@ test('dashboard requires authentication and renders for a logged in user', funct
     $this->actingAs(User::factory()->create())
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertSee('IoT Penyiram Tanaman Binus');
+        ->assertSee('IoT Penyiram Tanaman')
+        ->assertDontSee('Binus');
 });
 
 test('the default admin can log in after seeding', function () {

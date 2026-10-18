@@ -1,11 +1,11 @@
 @props(['title' => 'Dashboard'])
 
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="id" class="h-full">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $title }} · IOT BINUS</title>
+    <x-seo :title="$title" :noindex="true" />
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
 
