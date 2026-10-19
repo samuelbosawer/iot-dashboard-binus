@@ -14,13 +14,18 @@
 <title>{{ $fullTitle }}</title>
 <meta name="description" content="{{ $description }}">
 <meta name="robots" content="{{ $noindex ? 'noindex, nofollow' : 'index, follow' }}">
-<meta name="theme-color" content="#1d4ed8">
+<meta name="theme-color" content="#1e3a8a">
 <link rel="canonical" href="{{ $canonical }}">
 
 <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="48x48">
 <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
 <link rel="manifest" href="{{ asset('site.webmanifest') }}">
+<meta name="application-name" content="{{ $siteName }}">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Taman Pintar">
+<meta name="format-detection" content="telephone=no">
 
 @unless ($noindex)
     <meta name="keywords" content="IoT, smart irrigation, penyiram tanaman otomatis, ESP32, sensor kelembaban tanah, float switch, DHT11, monitoring tanaman">

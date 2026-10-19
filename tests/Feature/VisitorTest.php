@@ -85,3 +85,16 @@ test('the admin dashboard shows the dht section and links to the visitor page', 
         ->assertSee('Grafik Suhu &amp; Kelembaban Udara', false)
         ->assertSee(route('visitor'));
 });
+
+test('the bottom tab bar links to the visitor sections and marks the prediction page', function () {
+    $this->get(route('visitor'))
+        ->assertOk()
+        ->assertSee('href="#live"', false)
+        ->assertSee('data-section="live"', false)
+        ->assertSee('v-table-cards');
+
+    $this->get(route('prediction'))
+        ->assertOk()
+        ->assertSee('href="'.route('visitor').'#tabel"', false)
+        ->assertSee('data-active aria-current="page"', false);
+});

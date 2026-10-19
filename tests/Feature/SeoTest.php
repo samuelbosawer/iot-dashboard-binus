@@ -50,3 +50,24 @@ test('sitemap lists the public pages', function () {
 test('the visitor page has the data table section', function () {
     $this->get(route('visitor'))->assertSee('Tabel Data Sensor')->assertSee('v-table-body');
 });
+
+test('public pages are installable as a progressive web app', function (string $routeName) {
+    $this->get(route($routeName))
+        ->assertOk()
+        ->assertSee('site.webmanifest')
+        ->assertSee('<meta name="apple-mobile-web-app-capable" content="yes">', false)
+        ->assertSee('viewport-fit=cover', false)
+        ->assertSee('data-pwa-install', false)
+        ->assertSee('data-bottom-nav', false);
+})->with(['visitor', 'prediction']);
+
+test('the web app manifest has maskable icons and the offline assets exist', function () {
+    $manifest = json_decode(file_get_contents(public_path('site.webmanifest')), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($manifest)->toMatchArray(['display' => 'standalone', 'scope' => '/'])
+        ->and(collect($manifest['icons'])->where('purpose', 'maskable')->pluck('sizes')->all())->toBe(['192x192', '512x512']);
+
+    foreach ([...array_column($manifest['icons'], 'src'), '/sw.js', '/offline.html', '/apple-touch-icon.png'] as $path) {
+        expect(public_path(ltrim($path, '/')))->toBeFile();
+    }
+});
