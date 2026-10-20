@@ -27,7 +27,7 @@ class PredictionController extends Controller
     private const PROJECTION_HOURS = 6;
 
     /** Same threshold as the ESP32 firmware: below this the soil is dry and the pump waters. */
-    private const SOIL_DRY_PERCENT = 30;
+    private const SOIL_DRY_PERCENT = 35;
 
     private const OFFLINE_AFTER_MINUTES = 10;
 

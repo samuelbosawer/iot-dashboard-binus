@@ -105,7 +105,7 @@ class VisitorController extends Controller
 
         $soil = $summary['avg_soil'];
         $conclusions[] = match (true) {
-            $soil < 30 => ['icon' => 'fa-seedling', 'tone' => 'amber', 'text' => "Tanah cenderung kering dengan kelembaban rata-rata {$number($soil)}%."],
+            $soil < 35 => ['icon' => 'fa-seedling', 'tone' => 'amber', 'text' => "Tanah cenderung kering dengan kelembaban rata-rata {$number($soil)}%."],
             $soil <= 60 => ['icon' => 'fa-seedling', 'tone' => 'emerald', 'text' => "Kelembaban tanah cukup, rata-rata {$number($soil)}%."],
             default => ['icon' => 'fa-seedling', 'tone' => 'brand', 'text' => "Tanah terjaga lembab dengan rata-rata {$number($soil)}%."],
         };

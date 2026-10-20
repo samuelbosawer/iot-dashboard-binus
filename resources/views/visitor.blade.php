@@ -428,11 +428,11 @@
 
     @push('scripts')
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+        <x-sensor-stream />
         <script>
             (() => {
-                const HISTORY_URL = @json(url('/api/sensor/history'));
                 const RECORDS_URL = @json(url('/api/sensor'));
-                const REFRESH_MS = 5000;
+                const CLOCK_TICK_MS = 5000;
                 const STALE_AFTER_MS = 60000;
                 const RECENT_LIMIT = 30;
                 const GAUGE_CIRCUMFERENCE = 326.73;
@@ -550,19 +550,26 @@
                     setText('v-live-label', label);
                 };
 
+                let streamState = 'connecting';
+
                 const renderDevice = () => {
                     const latest = rows.at(-1);
+                    const age = latest ? Date.now() - new Date(latest.created_at).getTime() : null;
+                    const isOnline = age !== null && age <= STALE_AFTER_MS;
 
-                    if (!latest) {
+                    setText('v-updated', latest
+                        ? 'Update terakhir ' + latest.created_at_label + ' (' + formatAgo(age) + ')'
+                        : 'Menunggu ESP32 mengirim data pertama.');
+
+                    if (streamState === 'offline') {
+                        setLive('error', 'MQTT terputus');
+                    } else if (streamState === 'connecting') {
+                        setLive('idle', 'Menghubungkan MQTT…');
+                    } else if (!latest) {
                         setLive('idle', 'Belum ada data');
-                        setText('v-updated', 'Menunggu ESP32 mengirim data pertama.');
-                        return;
+                    } else {
+                        setLive(isOnline ? 'live' : 'stale', isOnline ? 'Live' : 'Offline');
                     }
-
-                    const age = Date.now() - new Date(latest.created_at).getTime();
-                    const isOnline = age <= STALE_AFTER_MS;
-                    setLive(isOnline ? 'live' : 'stale', isOnline ? 'Live' : 'Offline');
-                    setText('v-updated', 'Update terakhir ' + latest.created_at_label + ' (' + formatAgo(age) + ')');
                 };
 
                 /* ---------- Charts ---------- */
@@ -628,11 +635,9 @@
                     liveChart.update();
                 };
 
-                /* ---------- Live polling ---------- */
+                /* ---------- Live MQTT feed ---------- */
 
                 let rows = @json($recent);
-                let lastId = rows.length ? rows.at(-1).id : 0;
-                let isPolling = false;
 
                 const render = () => {
                     if (rows.length) renderLatest(rows.at(-1));
@@ -640,30 +645,14 @@
                     renderDevice();
                 };
 
-                const poll = async () => {
-                    if (isPolling || document.hidden) return;
-                    isPolling = true;
+                const pushReading = (row) => {
+                    rows = [...rows, row].slice(-RECENT_LIMIT);
+                    render();
+                };
 
-                    try {
-                        const response = await fetch(HISTORY_URL + '?limit=' + RECENT_LIMIT + (lastId ? '&after_id=' + lastId : ''), {
-                            headers: { Accept: 'application/json' },
-                            cache: 'no-store',
-                        });
-                        if (!response.ok) throw new Error('Bad response');
-
-                        const fresh = await response.json();
-                        if (fresh.length) {
-                            rows = [...rows, ...fresh].slice(-RECENT_LIMIT);
-                            lastId = rows.at(-1).id;
-                            render();
-                        } else {
-                            renderDevice();
-                        }
-                    } catch (error) {
-                        setLive('error', 'Koneksi terputus');
-                    } finally {
-                        isPolling = false;
-                    }
+                const onStreamStatus = (state) => {
+                    streamState = state;
+                    renderDevice();
                 };
 
                 /* ---------- Data table ---------- */
@@ -865,10 +854,9 @@
                 updateExportSummary();
                 loadTable();
                 render();
-                setInterval(poll, REFRESH_MS);
-                document.addEventListener('visibilitychange', () => {
-                    if (!document.hidden) poll();
-                });
+                window.SensorStream.connect({ onReading: pushReading, onStatus: onStreamStatus });
+                // Keeps "x dtk lalu" fresh and flips to Offline when the ESP32 stops publishing.
+                setInterval(renderDevice, CLOCK_TICK_MS);
             })();
         </script>
     @endpush

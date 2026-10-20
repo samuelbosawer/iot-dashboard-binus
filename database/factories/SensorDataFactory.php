@@ -26,6 +26,7 @@ class SensorDataFactory extends Factory
             'is_water_empty' => false,
             'is_soil_dry' => false,
             'pump_status' => false,
+            'pump_command' => 'auto',
             'lampu1_d25' => false,
             'lampu2_d14' => false,
         ];

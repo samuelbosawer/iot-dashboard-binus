@@ -1,261 +1,254 @@
 /*
- * IoT Penyiram Tanaman Binus - Monitoring Soil & Water
+ * Smart Garden Bawang Merah - MQTT v2
  * Board  : ESP32 (Arduino IDE)
- * Library: ArduinoJson (v7), Adafruit SSD1306, Adafruit GFX
+ * Library: PubSubClient, ArduinoJson (v7), DHT sensor library, Adafruit SSD1306, Adafruit GFX
+ *
+ * Komunikasi (tanpa HTTP API):
+ *   Publish   binus/garden/sensor/data  -> JSON sensor tiap 10 detik
+ *                                          (disimpan Laravel lewat `php artisan mqtt:listen`,
+ *                                           tampil live di dashboard lewat MQTT WebSocket)
+ *   Subscribe binus/garden/pump/cmd     -> "auto" | "pump_on" | "pump_off" (tombol di dashboard)
  *
  * Pin:
  *   Soil Moisture Capacitive : D34 (ADC)
- *   Water Level Float Switch : D15 (digital, INPUT_PULLUP, LOW = air habis)
- *                              kabel 1 -> D15, kabel 2 -> GND (tidak perlu resistor)
- *   Pompa Air                : D23
- *   Lampu Indikator 1        : D25 (tanah kering / sedang menyiram)
+ *   Water Level Float Switch : D13 (INPUT_PULLUP, LOW = air habis)
+ *   DHT11                    : D4
+ *   Pompa Air (relay)        : D23 (relay aktif LOW)
+ *   Lampu Indikator 1        : D25 (pompa menyala)
  *   Lampu Indikator 2        : D14 (air tandon habis)
- *   Buzzer                   : D13
  *   OLED SSD1306             : SDA 32, SCL 27, alamat 0x3C
  */
 
-#include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include <DHT.h>
 
-// ================= KONFIGURASI =================
-const char* WIFI_SSID     = "NAMA_WIFI_ANDA";
-const char* WIFI_PASSWORD = "PASSWORD_WIFI_ANDA";
+const char* ssid = "AKUT SB";
+const char* password = "samganteng#77";
 
-const char* SERVER_URL = "https://iotbinus.projectbos.web.id/api/sensor";
-const char* API_KEY    = "binus-iot-2025";
+// --- KONFIGURASI MQTT ---
+const char* mqtt_server = "broker.hivemq.com";
+const int mqtt_port = 1883;
+const char* mqtt_user = "";
+const char* mqtt_password = "";
+const char* topic_publish = "binus/garden/sensor/data";
+const char* topic_subscribe = "binus/garden/pump/cmd";
 
-const unsigned long SEND_INTERVAL_MS = 3000;
+#define SDA_PIN 32
+#define SCL_PIN 27
+#define DHTPIN 4
+#define DHTTYPE DHT11
 
-// Kalibrasi sensor (sesuaikan dengan sensor Anda)
-const int SOIL_RAW_DRY = 3200;        // nilai raw saat sensor di udara (0%)
-const int SOIL_RAW_WET = 1300;        // nilai raw saat sensor di air (100%)
-const int SOIL_DRY_ON_PERCENT  = 30;  // di bawah ini dianggap kering -> siram
-const int SOIL_DRY_OFF_PERCENT = 45;  // di atas ini pompa berhenti (histeresis)
+const int soilPin = 34, waterPin = 13, pumpPin = 23, lampu1 = 25, lampu2 = 14;
 
-// Float switch: true jika kontak TERTUTUP (D33 = LOW) saat pelampung NAIK / air ada.
-// Jika di dashboard terbalik (air ada tapi tertulis HABIS), ubah ke false
-// atau balik posisi pelampung pada batangnya.
-const bool FLOAT_CLOSED_WHEN_WATER = false;  // LOW (kontak tertutup) = air habis
-const unsigned long FLOAT_DEBOUNCE_MS = 1000;  // status harus stabil 1 detik (air bergelombang)
-// ===============================================
+const int SOIL_DRY = 3050, SOIL_WET = 1450, BATAS_KERING = 35;
+const long DURASI_SIRAM = 8000, JEDA_SIRAM = 7200000;
+#define FLOAT_HABIS LOW
+#define RELAY_LOW true
 
-// Pin
-const int PIN_SOIL   = 34;
-const int PIN_WATER  = 15;
-const int PIN_PUMP   = 23;
-const int PIN_LAMPU1 = 25;
-const int PIN_LAMPU2 = 14;
-const int PIN_BUZZER = 13;
-const int PIN_SDA    = 32;
-const int PIN_SCL    = 27;
+Adafruit_SSD1306 display(128, 64, &Wire, -1);
+DHT dht(DHTPIN, DHTTYPE);
+WiFiClient espClient;
+PubSubClient client(espClient);
 
-// OLED
-const int SCREEN_WIDTH  = 128;
-const int SCREEN_HEIGHT = 64;
-const uint8_t OLED_ADDRESS = 0x3C;
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-bool oledReady = false;
+unsigned long lastSend = 0, lastSiram = 0, lastWiFiCheck = 0, lastPumpCheck = 0;
+bool sedangSiram = false;
+unsigned long mulaiSiram = 0;
+String pumpCommand = "auto";
 
-unsigned long lastSendMs = 0;
-bool pumpOn = false;
-int lastHttpCode = 0;
-
-bool waterEmptyStable = true;       // anggap habis sampai float switch terbaca stabil
-bool waterEmptyCandidate = true;
-unsigned long waterCandidateSinceMs = 0;
-
-// Baca float switch dengan debounce agar gelombang air tidak membuat status berkedip.
-bool readWaterEmpty() {
-  bool contactClosed = digitalRead(PIN_WATER) == LOW;
-  bool waterPresent  = FLOAT_CLOSED_WHEN_WATER ? contactClosed : !contactClosed;
-  bool emptyNow      = !waterPresent;
-
-  if (emptyNow != waterEmptyCandidate) {
-    waterEmptyCandidate = emptyNow;
-    waterCandidateSinceMs = millis();
-  } else if (emptyNow != waterEmptyStable && millis() - waterCandidateSinceMs >= FLOAT_DEBOUNCE_MS) {
-    waterEmptyStable = emptyNow;
-  }
-
-  return waterEmptyStable;
+void setPump(bool nyala) {
+  digitalWrite(pumpPin, RELAY_LOW ? (nyala ? LOW : HIGH) : (nyala ? HIGH : LOW));
 }
 
-int readAverage(int pin, int samples = 10) {
-  long total = 0;
-  for (int i = 0; i < samples; i++) {
-    total += analogRead(pin);
-    delay(5);
-  }
-  return total / samples;
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  String message = "";
+  for (int i = 0; i < length; i++) message += (char)payload[i];
+
+  Serial.println("\n========== PERINTAH MASUK ==========");
+  Serial.printf("Topik  : %s\n", topic);
+  Serial.printf("Pesan  : %s\n", message.c_str());
+  Serial.printf("Waktu  : %lu detik\n", millis()/1000);
+  Serial.println("====================================\n");
+
+  pumpCommand = message;
+  lastPumpCheck = millis();
 }
 
-void connectWiFi() {
-  if (WiFi.status() == WL_CONNECTED) return;
+void reconnect() {
+  if(client.connected()) return;
+  Serial.println("\n[MQTT] Mencoba konek ke broker.hivemq.com ...");
+  String clientId = "ESP32-BAMER-" + String(random(0xffff), HEX);
 
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Menghubungkan WiFi");
-
-  unsigned long start = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("\nWiFi terhubung, IP: ");
-    Serial.println(WiFi.localIP());
+  if (client.connect(clientId.c_str(), mqtt_user, mqtt_password)) {
+    Serial.println("[MQTT] ✓ BERHASIL TERKONEKSI!");
+    Serial.printf("[MQTT] Subscribe ke: %s\n", topic_subscribe);
+    client.subscribe(topic_subscribe);
   } else {
-    Serial.println("\nWiFi gagal, akan dicoba lagi.");
+    Serial.printf("[MQTT] ✗ GAGAL rc=%d\n", client.state());
   }
 }
 
-void drawOled(int soilPercent, bool waterEmpty, bool soilDry, bool pump) {
-  if (!oledReady) return;
-
-  display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
-  display.setTextSize(1);
-
-  display.setCursor(0, 0);
-  display.print("IoT Penyiram Binus");
-
-  display.setCursor(0, 14);
-  display.printf("Tanah : %d %%", soilPercent);
-
-  display.setCursor(0, 24);
-  display.printf("Air   : %s", waterEmpty ? "HABIS" : "ADA");
-
-  display.setCursor(0, 34);
-  display.printf("Pompa : %s", pump ? "ON" : "OFF");
-
-  display.setCursor(0, 44);
-  if (waterEmpty) {
-    display.print("STATUS: AIR HABIS!");
-  } else if (soilDry) {
-    display.print("STATUS: TANAH KERING");
-  } else {
-    display.print("STATUS: AMAN");
-  }
-
-  display.setCursor(0, 55);
-  display.print(WiFi.status() == WL_CONNECTED ? "WiFi OK " : "WiFi -- ");
-  display.printf("HTTP:%d", lastHttpCode);
-
-  display.display();
+void ensureWiFi(){
+  if(WiFi.status()==WL_CONNECTED) return;
+  Serial.println("[WiFi] Terputus, reconnect...");
+  WiFi.disconnect(true); delay(500);
+  WiFi.begin(ssid,password);
 }
 
-void sendToServer(int soilPercent, int soilRaw, bool waterEmpty,
-                  bool soilDry, bool pump, bool lampu1, bool lampu2) {
-  if (WiFi.status() != WL_CONNECTED) {
-    lastHttpCode = 0;
-    return;
-  }
-
-  JsonDocument doc;
-  doc["soil_percent"]   = soilPercent;
-  doc["soil_raw"]       = soilRaw;
-  doc["is_water_empty"] = waterEmpty;
-  doc["is_soil_dry"]    = soilDry;
-  doc["pump_status"]    = pump;
-  doc["lampu1_d25"]     = lampu1;
-  doc["lampu2_d14"]     = lampu2;
-
-  String payload;
-  serializeJson(doc, payload);
-
-  WiFiClientSecure client;
-  client.setInsecure();  // lewati verifikasi sertifikat (sederhana untuk praktikum)
-
-  HTTPClient http;
-  http.setTimeout(8000);
-
-  if (http.begin(client, SERVER_URL)) {
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("Accept", "application/json");
-    http.addHeader("x-api-key", API_KEY);
-
-    lastHttpCode = http.POST(payload);
-    Serial.printf("POST %s -> HTTP %d\n", payload.c_str(), lastHttpCode);
-
-    if (lastHttpCode <= 0) {
-      Serial.println(http.errorToString(lastHttpCode));
-    }
-    http.end();
-  }
+int bacaSoil() {
+  long t = 0;
+  for(int i = 0; i < 10; i++) { t += analogRead(soilPin); delay(10); }
+  return t / 10;
 }
 
 void setup() {
   Serial.begin(115200);
+  delay(1000);
+  Serial.println("\n\n");
+  Serial.println("==========================================");
+  Serial.println("  SMART GARDEN BAWANG MERAH - MQTT v2");
+  Serial.println("==========================================");
 
-  pinMode(PIN_PUMP, OUTPUT);
-  pinMode(PIN_LAMPU1, OUTPUT);
-  pinMode(PIN_LAMPU2, OUTPUT);
-  pinMode(PIN_BUZZER, OUTPUT);
-  pinMode(PIN_WATER, INPUT_PULLUP);  // float switch ke GND, pull-up internal
-  digitalWrite(PIN_PUMP, LOW);
-  digitalWrite(PIN_LAMPU1, LOW);
-  digitalWrite(PIN_LAMPU2, LOW);
-  digitalWrite(PIN_BUZZER, LOW);
+  pinMode(pumpPin, OUTPUT);
+  pinMode(lampu1, OUTPUT);
+  pinMode(lampu2, OUTPUT);
+  pinMode(waterPin, INPUT_PULLUP);
 
-  analogReadResolution(12);  // 0 - 4095
+  setPump(false);
+  digitalWrite(lampu1, LOW);
+  digitalWrite(lampu2, LOW);
 
-  Wire.begin(PIN_SDA, PIN_SCL);
-  oledReady = display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS);
-  if (!oledReady) {
-    Serial.println("OLED tidak ditemukan (0x3C), lanjut tanpa OLED.");
-  } else {
-    display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(0, 0);
-    display.println("IoT Penyiram Binus");
-    display.println("Menghubungkan WiFi..");
-    display.display();
+  Wire.begin(SDA_PIN, SCL_PIN);
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  dht.begin();
+
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  WiFi.begin(ssid, password);
+
+  display.clearDisplay(); display.setCursor(0,0); display.setTextColor(1);
+  display.println("Connecting WiFi..."); display.display();
+
+  Serial.printf("[WiFi] Menghubungkan ke %s\n", ssid);
+  int c=0;
+  while (WiFi.status() != WL_CONNECTED && c < 20) {
+    delay(500);
+    Serial.print(".");
+    c++;
   }
 
-  connectWiFi();
+  if(WiFi.status()==WL_CONNECTED){
+    Serial.printf("\n[WiFi] ✓ TERHUBUNG! IP: %s | RSSI: %d dBm\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
+  } else {
+    Serial.println("\n[WiFi] ✗ GAGAL KONEK");
+  }
+
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(mqttCallback);
+  client.setKeepAlive(60);
+  // Default buffer PubSubClient hanya 256 byte, JSON sensor ~300 byte -> publish gagal diam-diam.
+  client.setBufferSize(1024);
+
+  lastSiram = millis() - JEDA_SIRAM;
+  Serial.println("==========================================\n");
 }
 
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
-    connectWiFi();
+  if(millis()-lastWiFiCheck>15000){ lastWiFiCheck=millis(); ensureWiFi(); }
+
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+
+  int raw = bacaSoil();
+  int persen = constrain(map(raw, SOIL_DRY, SOIL_WET, 0, 100), 0, 100);
+  int wRaw = digitalRead(waterPin);
+  bool habis = (wRaw == FLOAT_HABIS);
+  float hum = dht.readHumidity();
+  float temp = dht.readTemperature();
+  bool valid = !isnan(hum) && !isnan(temp);
+
+  bool pompaOn = false;
+  unsigned long now = millis();
+  String stat;
+
+  if (pumpCommand == "pump_on") {
+    setPump(true); pompaOn = true; stat = "MANUAL ON"; sedangSiram = false;
+  }
+  else if (pumpCommand == "pump_off") {
+    setPump(false); stat = "MANUAL OFF"; sedangSiram = false;
+  }
+  else {
+    if (sedangSiram) {
+      if (now - mulaiSiram >= DURASI_SIRAM) {
+        setPump(false); sedangSiram = false; lastSiram = now; stat = "SELESAI";
+      } else {
+        setPump(true); pompaOn = true; stat = "AUTO SIRAM";
+      }
+    } else {
+      if (habis) {
+        stat = "AIR HABIS"; setPump(false);
+      } else if (persen < BATAS_KERING && now - lastSiram >= JEDA_SIRAM) {
+        setPump(true); sedangSiram = true; mulaiSiram = now; pompaOn = true; stat = "MULAI AUTO";
+      } else {
+        stat = persen < BATAS_KERING ? "TUNGGU" : "LEMBAB AMAN"; setPump(false);
+      }
+    }
   }
 
-  int soilRaw   = readAverage(PIN_SOIL);
-  int soilPercent = constrain(map(soilRaw, SOIL_RAW_DRY, SOIL_RAW_WET, 0, 100), 0, 100);
+  digitalWrite(lampu1, pompaOn ? HIGH : LOW);
+  digitalWrite(lampu2, habis ? HIGH : LOW);
 
-  bool waterEmpty = readWaterEmpty();
-  bool soilDry    = soilPercent < SOIL_DRY_ON_PERCENT;
+  display.clearDisplay(); display.setCursor(0,0); display.setTextColor(1);
+  display.printf("MQTT:%s %ddBm\n", client.connected()?"ON":"OFF", WiFi.RSSI());
+  display.printf("Soil %d%% %s\n", persen, pumpCommand.c_str());
+  if (valid) display.printf("T%.1f H%.0f\n", temp, hum);
+  else display.println("DHT Error");
+  display.printf("%s %s\n", habis ? "HABIS" : "OK", stat.c_str());
+  display.display();
 
-  // Pompa menyala saat tanah kering & air ada; mati saat tanah cukup basah / air habis
-  if (waterEmpty) {
-    pumpOn = false;
-  } else if (soilDry) {
-    pumpOn = true;
-  } else if (soilPercent >= SOIL_DRY_OFF_PERCENT) {
-    pumpOn = false;
+  if (millis() - lastSend > 10000) {
+    lastSend = millis();
+    if(WiFi.status()!=WL_CONNECTED) return;
+    if(!client.connected()) return;
+
+    JsonDocument master;
+    master["device_id"] = "ESP32-BAMER-01";
+    master["tanaman"] = "bawang_merah";
+    master["soil_percent"] = persen;
+    master["soil_raw"] = raw;
+    master["temperature"] = valid ? temp : 0;
+    master["humidity"] = valid ? hum : 0;
+    master["water_raw"] = wRaw;
+    master["water_level_status"] = habis ? "EMPTY" : "OK";
+    master["is_water_empty"] = habis;
+    master["is_soil_dry"] = persen < BATAS_KERING;
+    master["pump_status"] = pompaOn ? "ON" : "OFF";
+    master["relay_d23"] = pompaOn;
+    master["pump_command"] = pumpCommand;
+
+    String payload;
+    serializeJson(master, payload);
+    bool terkirim = client.publish(topic_publish, payload.c_str());
+
+    // SERIAL MONITOR RAPIH
+    Serial.println("--------------------------------------------------");
+    Serial.printf("| WAKTU: %lu detik | WiFi: %d dBm | MQTT: %s\n", millis()/1000, WiFi.RSSI(), client.connected() ? "OK" : "PUTUS");
+    Serial.printf("| Publish: %s (%d byte)\n", terkirim ? "TERKIRIM" : "GAGAL", payload.length());
+    Serial.println("--------------------------------------------------");
+    Serial.printf("| Tanah : %3d%% (raw %4d) | %s\n", persen, raw, persen < BATAS_KERING ? "KERING" : "LEMBAB");
+    if(valid) Serial.printf("| Udara : Suhu %.1f C | Hum %.0f%%\n", temp, hum);
+    else Serial.println("| Udara : DHT ERROR");
+    Serial.printf("| Air   : %s (pin %d) | Pompa : %s (%s)\n", habis ? "HABIS" : "OK", wRaw, pompaOn ? "NYALA" : "MATI", stat.c_str());
+    Serial.printf("| Perintah: %s\n", pumpCommand.c_str());
+    Serial.println("--------------------------------------------------");
+    Serial.println(payload);
+    Serial.println("--------------------------------------------------\n");
   }
-
-  bool lampu1 = soilDry || pumpOn;  // D25: tanah kering / sedang menyiram
-  bool lampu2 = waterEmpty;         // D14: air tandon habis
-
-  digitalWrite(PIN_PUMP, pumpOn ? HIGH : LOW);
-  digitalWrite(PIN_LAMPU1, lampu1 ? HIGH : LOW);
-  digitalWrite(PIN_LAMPU2, lampu2 ? HIGH : LOW);
-
-  // Buzzer berbunyi putus-putus saat air habis
-  digitalWrite(PIN_BUZZER, (waterEmpty && (millis() / 500) % 2 == 0) ? HIGH : LOW);
-
-  if (millis() - lastSendMs >= SEND_INTERVAL_MS) {
-    lastSendMs = millis();
-    sendToServer(soilPercent, soilRaw, waterEmpty, soilDry, pumpOn, lampu1, lampu2);
-  }
-
-  drawOled(soilPercent, waterEmpty, soilDry, pumpOn);
-  delay(100);
 }

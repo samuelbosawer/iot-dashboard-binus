@@ -1,3 +1,7 @@
+@php
+    $pumpLabels = collect($pumpCommands)->mapWithKeys(fn ($command) => [$command->value => $command->label()]);
+@endphp
+
 <x-layouts.app title="Dashboard">
     {{-- Hero --}}
     <section class="relative mb-6 overflow-hidden rounded-3xl bg-linear-to-br from-brand-600 via-brand-700 to-brand-900 p-6 text-white shadow-lg sm:p-8">
@@ -88,7 +92,7 @@
                     <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-50 text-sky-600"><i class="fa-solid fa-water"></i></span>
                     <div>
                         <p class="text-sm font-semibold text-slate-900">Water Level Float Switch</p>
-                        <p class="text-xs text-slate-400">Pelampung tandon · Pin D15 (LOW = air habis)</p>
+                        <p class="text-xs text-slate-400">Pelampung tandon · Pin D13 (LOW = air habis)</p>
                     </div>
                 </div>
                 <span id="water-badge" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">--</span>
@@ -129,6 +133,30 @@
                     <p class="text-xs text-slate-400">aktif di data terakhir</p>
                 </div>
             </div>
+
+            {{-- Pump control: published to the ESP32 on the MQTT pump topic --}}
+            <form id="pump-form" method="POST" action="{{ route('pump.command') }}" class="mt-5 border-t border-slate-100 pt-4">
+                @csrf
+                <div class="flex items-center justify-between gap-2">
+                    <p class="text-xs font-semibold text-slate-500"><i class="fa-solid fa-tower-broadcast mr-1"></i> Kontrol pompa (MQTT)</p>
+                    <p class="text-xs text-slate-400">Mode: <span id="pump-mode" class="font-semibold text-slate-700">--</span></p>
+                </div>
+                <div class="mt-2 grid grid-cols-3 gap-2">
+                    @foreach ($pumpCommands as $command)
+                        <button type="submit" name="command" value="{{ $command->value }}" data-pump-command="{{ $command->value }}"
+                            class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-600 transition hover:border-brand-300 hover:text-brand-700 disabled:cursor-wait disabled:opacity-60 data-active:border-brand-500 data-active:bg-brand-50 data-active:text-brand-700">
+                            <i class="fa-solid {{ $command->icon() }}"></i>
+                            {{ $command->label() }}
+                        </button>
+                    @endforeach
+                </div>
+                <p id="pump-feedback" @class([
+                    'mt-2 text-xs',
+                    'text-red-600' => $errors->has('command'),
+                    'text-emerald-600' => session('status') && ! $errors->has('command'),
+                    'text-slate-400' => ! session('status') && ! $errors->has('command'),
+                ])>{{ $errors->first('command') ?: session('status', 'Manual ON menyala terus sampai dikirim Otomatis atau Manual OFF.') }}</p>
+            </form>
         </x-ui.card>
     </div>
 
@@ -194,7 +222,7 @@
                 <span id="lamp-d25-icon" class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xl text-slate-400 transition"><i class="fa-solid fa-lightbulb"></i></span>
                 <div class="min-w-0 flex-1">
                     <p class="text-sm font-semibold text-slate-900">Lampu Indikator 1</p>
-                    <p class="text-xs text-slate-400">Pin D25 · Menyala saat Siram ON</p>
+                    <p class="text-xs text-slate-400">Pin D25 · Menyala saat pompa ON</p>
                 </div>
                 <span id="lamp-d25-state" class="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-500">--</span>
             </div>
@@ -205,7 +233,7 @@
                 <span id="lamp-d14-icon" class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xl text-slate-400 transition"><i class="fa-solid fa-lightbulb"></i></span>
                 <div class="min-w-0 flex-1">
                     <p class="text-sm font-semibold text-slate-900">Lampu Indikator 2</p>
-                    <p class="text-xs text-slate-400">Pin D14 · Menyala + buzzer saat air habis</p>
+                    <p class="text-xs text-slate-400">Pin D14 · Menyala saat air habis</p>
                 </div>
                 <span id="lamp-d14-state" class="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-500">--</span>
             </div>
@@ -420,11 +448,15 @@
 
     @push('scripts')
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+        <x-sensor-stream />
         <script>
             (() => {
                 const HISTORY_URL = @json(url('/api/sensor/history'));
                 const RECORDS_URL = @json(url('/api/sensor'));
-                const REFRESH_MS = 1500;
+                const PUMP_LABELS = @json($pumpLabels);
+                const CLOCK_TICK_MS = 5000;
+                // Give `php artisan mqtt:listen` a moment to store the reading before the table reloads.
+                const TABLE_REFRESH_DELAY_MS = 2000;
                 const REQUEST_TIMEOUT_MS = 5000;
                 const STALE_AFTER_MS = 60000;
                 const GAUGE_CIRCUMFERENCE = 326.73;
@@ -450,21 +482,21 @@
                         icon: 'bg-red-500 text-white',
                         iconClass: 'fa-triangle-exclamation',
                         label: 'ALERT: Air Habis',
-                        text: 'Float switch D15 mendeteksi air habis. Pompa D23 dikunci OFF, lampu D14 & buzzer menyala.',
+                        text: 'Float switch D13 mendeteksi air habis. Pompa D23 dikunci OFF (mode otomatis), lampu D14 menyala.',
                         badge: 'bg-red-100 text-red-700',
                     },
                     dry: {
                         icon: 'bg-amber-400 text-white',
                         iconClass: 'fa-seedling',
                         label: 'Siram ON',
-                        text: 'Tanah kering (< 30%) dan air tersedia. Pompa D23 menyiram, lampu D25 menyala.',
+                        text: 'Tanah kering (< 35%) dan air tersedia. Pompa D23 menyiram 8 detik (jeda 2 jam), lampu D25 menyala.',
                         badge: 'bg-amber-100 text-amber-700',
                     },
                     ok: {
                         icon: 'bg-emerald-500 text-white',
                         iconClass: 'fa-circle-check',
                         label: 'Aman - Basah',
-                        text: 'Tanah cukup basah (≥ 30%) dan air tersedia. Pompa D23 mati.',
+                        text: 'Tanah cukup basah (≥ 35%) dan air tersedia. Pompa D23 mati.',
                         badge: 'bg-emerald-100 text-emerald-700',
                     },
                 };
@@ -555,7 +587,7 @@
 
                     setText('soil-percent', d.soil_percent);
                     setText('soil-raw', d.soil_raw);
-                    setText('soil-badge', d.is_soil_dry ? 'Kering (< 30%)' : 'Basah (≥ 30%)');
+                    setText('soil-badge', d.is_soil_dry ? 'Kering (< 35%)' : 'Basah (≥ 35%)');
                     setClass('soil-badge', 'mt-3 ' + PILL + (d.is_soil_dry ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'));
                     $('soil-gauge').style.strokeDashoffset = GAUGE_CIRCUMFERENCE * (1 - clamp(d.soil_percent, 0, 100) / 100);
                     $('soil-gauge').setAttribute('class', 'transition-all duration-700 ' + (d.is_soil_dry ? 'stroke-amber-500' : 'stroke-brand-500'));
@@ -570,9 +602,14 @@
 
                     setText('pump-status', d.pump_status ? 'ON' : 'OFF');
                     setClass('pump-status', 'text-4xl font-bold ' + (d.pump_status ? 'text-emerald-600' : 'text-slate-400'));
-                    setText('pump-text', d.pump_status
-                        ? 'Menyiram: air ada & tanah < 30%'
-                        : d.is_water_empty ? 'Dikunci OFF karena air habis' : 'Mati, tanah cukup basah');
+                    setText('pump-text', d.pump_command === 'pump_on'
+                        ? 'Manual ON dari dashboard'
+                        : d.pump_command === 'pump_off'
+                            ? 'Manual OFF dari dashboard'
+                            : d.pump_status
+                                ? 'Menyiram: air ada & tanah < 35%'
+                                : d.is_water_empty ? 'Dikunci OFF karena air habis' : 'Mati, tanah cukup basah');
+                    renderPumpMode(d.pump_command);
                     setText('pump-badge', d.pump_status ? 'Menyiram' : d.is_water_empty ? 'Terkunci' : 'Standby');
                     setClass('pump-badge', PILL + (d.pump_status ? 'bg-emerald-100 text-emerald-700' : OFF));
                     setClass('pump-icon', 'flex h-11 w-11 items-center justify-center rounded-xl transition ' + (d.pump_status ? 'animate-pulse bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'));
@@ -581,6 +618,13 @@
                     renderLamp('lamp-d14', d.lampu2_d14, 'bg-red-500 text-white shadow-lg shadow-red-500/50');
 
                     renderDht(d);
+                };
+
+                const renderPumpMode = (command) => {
+                    setText('pump-mode', PUMP_LABELS[command] ?? command ?? '--');
+                    document.querySelectorAll('[data-pump-command]').forEach((button) => {
+                        button.toggleAttribute('data-active', button.dataset.pumpCommand === command);
+                    });
                 };
 
                 const renderDht = (d) => {
@@ -635,18 +679,28 @@
                     setText('live-label', label);
                 };
 
+                let streamState = 'connecting';
+
                 const renderDevice = (rows) => {
                     const latest = rows.at(-1);
 
+                    if (streamState !== 'connected') {
+                        setLive(streamState === 'offline' ? 'error' : 'idle', streamState === 'offline' ? 'MQTT terputus, mencoba lagi…' : 'Menghubungkan ke broker MQTT…');
+                    }
+
                     if (!latest) {
-                        setLive('idle', 'Belum ada data dari perangkat');
+                        if (streamState === 'connected') {
+                            setLive('idle', 'Belum ada data dari perangkat');
+                        }
                         return;
                     }
 
                     const age = Date.now() - new Date(latest.created_at).getTime();
                     const isOnline = age <= STALE_AFTER_MS;
 
-                    setLive(isOnline ? 'live' : 'stale', isOnline ? 'Live · ' + formatAgo(age) : 'Offline · terakhir ' + latest.created_at_label);
+                    if (streamState === 'connected') {
+                        setLive(isOnline ? 'live' : 'stale', isOnline ? 'Live MQTT · ' + formatAgo(age) : 'Offline · terakhir ' + latest.created_at_label);
+                    }
                     setText('device-last', 'Update ' + latest.created_at_label + ' (' + formatAgo(age) + ')');
                     setText('device-state', isOnline ? 'Online' : 'Offline');
                     setClass('device-state', STATE_PILL + (isOnline ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'));
@@ -877,12 +931,10 @@
                     dhtChart.update();
                 };
 
-                /* ---------- Live polling ---------- */
+                /* ---------- Live MQTT feed ---------- */
 
                 let historyLimit = @json($historyLimit);
                 let rows = @json($history);
-                let lastId = rows.length ? rows.at(-1).id : 0;
-                let isPolling = false;
 
                 const renderLive = () => {
                     if (rows.length) {
@@ -894,31 +946,17 @@
                 };
 
                 /**
-                 * Poll only readings newer than the last one we have, so each tick is a tiny request.
+                 * Every message the ESP32 publishes arrives here straight from the broker.
                  */
-                const poll = async () => {
-                    if (isPolling || document.hidden) {
-                        return;
-                    }
+                const pushReading = (row) => {
+                    rows = [...rows, row].slice(-historyLimit);
+                    renderLive();
+                    setTimeout(refreshTableIfLive, TABLE_REFRESH_DELAY_MS);
+                };
 
-                    isPolling = true;
-
-                    try {
-                        const fresh = await fetchJson(HISTORY_URL + '?limit=' + historyLimit + (lastId ? '&after_id=' + lastId : ''));
-
-                        if (fresh.length) {
-                            rows = [...rows, ...fresh].slice(-historyLimit);
-                            lastId = rows.at(-1).id;
-                            renderLive();
-                            refreshTableIfLive(new Set(fresh.map((d) => d.id)));
-                        } else {
-                            renderDevice(rows);
-                        }
-                    } catch (error) {
-                        setLive('error', 'Gagal memuat data, mencoba lagi…');
-                    } finally {
-                        isPolling = false;
-                    }
+                const onStreamStatus = (state) => {
+                    streamState = state;
+                    renderDevice(rows);
                 };
 
                 const setRange = async (range) => {
@@ -930,7 +968,6 @@
 
                     try {
                         rows = await fetchJson(HISTORY_URL + '?limit=' + range);
-                        lastId = rows.length ? rows.at(-1).id : 0;
                         renderLive();
                     } catch (error) {
                         setLive('error', 'Gagal memuat grafik, mencoba lagi…');
@@ -1007,7 +1044,12 @@
                     return parts.length ? 'Filter: ' + parts.join(' · ') : 'Semua data, terbaru di atas';
                 };
 
-                const loadTable = async (highlightIds) => {
+                let tableTopId = 0;
+
+                /**
+                 * @param {boolean} highlightNew  mark rows stored since the previous load (live refresh)
+                 */
+                const loadTable = async (highlightNew = false) => {
                     const params = new URLSearchParams({ page, per_page: 15 });
                     Object.entries(filters).forEach(([key, value]) => value && params.set(key, value));
 
@@ -1017,7 +1059,9 @@
                         const result = await fetchJson(RECORDS_URL + '?' + params);
                         const meta = result.meta;
 
-                        renderTable(result.data, highlightIds);
+                        const previousTopId = tableTopId;
+                        tableTopId = Math.max(tableTopId, result.data[0]?.id ?? 0);
+                        renderTable(result.data, new Set(highlightNew ? result.data.filter((d) => d.id > previousTopId).map((d) => d.id) : []));
                         setText('table-summary', describeFilters() + ' · ' + meta.total + ' data');
                         setText('page-info', meta.total ? 'Menampilkan ' + meta.from + '–' + meta.to + ' dari ' + meta.total + ' · Hal. ' + meta.current_page + '/' + meta.last_page : 'Tidak ada data');
                         $('page-prev').disabled = meta.current_page <= 1;
@@ -1032,10 +1076,10 @@
                 /**
                  * Only the first page of a filter that can still receive new readings follows the live feed.
                  */
-                const refreshTableIfLive = (highlightIds) => {
+                const refreshTableIfLive = () => {
                     const today = toYmd(new Date());
                     if (page === 1 && (!filters.date_to || filters.date_to >= today)) {
-                        loadTable(highlightIds);
+                        loadTable(true);
                     }
                 };
 
@@ -1135,6 +1179,35 @@
                     });
                 });
 
+                /* ---------- Pump control over MQTT ---------- */
+
+                const pumpForm = $('pump-form');
+
+                pumpForm.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+
+                    const buttons = [...pumpForm.querySelectorAll('[data-pump-command]')];
+                    const body = new FormData(pumpForm);
+                    body.set('command', event.submitter.value);
+                    buttons.forEach((button) => { button.disabled = true; });
+
+                    try {
+                        const response = await fetch(pumpForm.action, { method: 'POST', headers: { Accept: 'application/json' }, body });
+                        const result = await response.json();
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Gagal mengirim perintah.');
+                        }
+
+                        setText('pump-feedback', result.message + ' Menunggu konfirmasi dari data berikutnya…');
+                        setClass('pump-feedback', 'mt-2 text-xs text-emerald-600');
+                    } catch (error) {
+                        setText('pump-feedback', error.message);
+                        setClass('pump-feedback', 'mt-2 text-xs text-red-600');
+                    } finally {
+                        buttons.forEach((button) => { button.disabled = false; });
+                    }
+                });
+
                 /* ---------- Boot ---------- */
 
                 $('filter-date-from').max = $('filter-date-to').max = toYmd(new Date());
@@ -1148,12 +1221,9 @@
                 renderLive();
                 setRange(historyLimit);
                 loadTable();
-                setInterval(poll, REFRESH_MS);
-                document.addEventListener('visibilitychange', () => {
-                    if (!document.hidden) {
-                        poll();
-                    }
-                });
+                window.SensorStream.connect({ onReading: pushReading, onStatus: onStreamStatus });
+                // Keeps "x dtk lalu" fresh and flips to Offline when the ESP32 stops publishing.
+                setInterval(() => renderDevice(rows), CLOCK_TICK_MS);
             })();
         </script>
     @endpush

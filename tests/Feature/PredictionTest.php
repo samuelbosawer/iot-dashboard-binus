@@ -48,7 +48,7 @@ test('the prediction chart uses real hourly data and projects the soil trend', f
         ->and(end($hourly)['avg_soil'])->toBe(45.0)
         ->and($trend['available'])->toBeTrue()
         ->and($trend['slope'])->toBe(-5.0)
-        ->and($trend['hours_until_dry'])->toBe(3.0)
+        ->and($trend['hours_until_dry'])->toBe(2.0)
         ->and($trend['projection'])->toHaveCount(6);
 
     $response->assertSee('Tanah segera mengering')->assertSee('prediction-chart');

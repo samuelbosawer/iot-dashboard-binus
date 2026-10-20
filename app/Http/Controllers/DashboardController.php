@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\PumpCommand;
 use App\Enums\SensorDataset;
 use App\Http\Resources\SensorDataResource;
 use App\Models\SensorData;
@@ -28,6 +29,7 @@ class DashboardController extends Controller
             'history' => SensorDataResource::collection($history)->resolve(),
             'historyLimit' => self::HISTORY_LIMIT,
             'datasets' => SensorDataset::cases(),
+            'pumpCommands' => PumpCommand::cases(),
         ]);
     }
 }

@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PredictionController;
+use App\Http\Controllers\PumpCommandController;
 use App\Http\Controllers\SensorExportController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\UserController;
@@ -31,6 +32,9 @@ Route::middleware('auth')->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('dashboard/export', SensorExportController::class)->name('sensor.export');
     Route::get('dashboard/prediksi', [PredictionController::class, 'dashboard'])->name('dashboard.prediction');
+    Route::post('dashboard/pump', PumpCommandController::class)
+        ->middleware('throttle:20,1')
+        ->name('pump.command');
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
     Route::resource('users', UserController::class)

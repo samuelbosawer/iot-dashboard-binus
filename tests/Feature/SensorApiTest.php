@@ -6,77 +6,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-/**
- * @return array<string, mixed>
- */
-function sensorPayload(array $overrides = []): array
-{
-    return array_merge([
-        'soil_percent' => 25,
-        'soil_raw' => 3100,
-        'water_raw' => 2000,
-        'is_water_empty' => false,
-        'is_soil_dry' => true,
-        'pump_status' => true,
-        'lampu1_d25' => true,
-        'lampu2_d14' => false,
-    ], $overrides);
-}
-
-test('esp32 can store a reading with a valid api key', function () {
-    $response = $this->postJson('/api/sensor', sensorPayload(), ['x-api-key' => 'binus-iot-2025']);
-
-    $response->assertCreated()->assertJsonPath('soil_percent', 25);
-    $this->assertDatabaseHas('sensor_data', ['soil_percent' => 25, 'is_soil_dry' => true, 'pump_status' => true]);
-});
-
-test('esp32 firmware payload is accepted and missing lamp states are derived', function (array $payload, array $expected) {
-    $this->postJson('/api/sensor', $payload, ['x-api-key' => 'binus-iot-2025'])->assertCreated();
-
-    $this->assertDatabaseHas('sensor_data', $expected);
-})->with([
-    'soil dry, watering' => [
-        ['soil_percent' => 20, 'soil_raw' => 2600, 'water_raw' => 900, 'is_water_empty' => false, 'is_soil_dry' => true, 'relay_d23' => true, 'pump_status' => true],
-        ['soil_percent' => 20, 'pump_status' => true, 'lampu1_d25' => true, 'lampu2_d14' => false],
-    ],
-    'water empty' => [
-        ['soil_percent' => 10, 'soil_raw' => 2800, 'water_raw' => 5, 'is_water_empty' => true, 'is_soil_dry' => true, 'relay_d23' => false, 'pump_status' => false],
-        ['soil_percent' => 10, 'pump_status' => false, 'lampu1_d25' => false, 'lampu2_d14' => true],
-    ],
-    'safe' => [
-        ['soil_percent' => 70, 'soil_raw' => 1700, 'water_raw' => 1200, 'is_water_empty' => false, 'is_soil_dry' => false, 'relay_d23' => false, 'pump_status' => false],
-        ['soil_percent' => 70, 'pump_status' => false, 'lampu1_d25' => false, 'lampu2_d14' => false],
-    ],
-]);
-
-test('relay_d23 is used as the real pump state', function () {
-    $this->postJson('/api/sensor', sensorPayload(['relay_d23' => false, 'pump_status' => true]), ['x-api-key' => 'binus-iot-2025'])
-        ->assertCreated()
-        ->assertJsonPath('pump_status', false);
-});
-
-test('storing a reading without an api key is rejected', function () {
-    $this->postJson('/api/sensor', sensorPayload())->assertUnauthorized();
-    $this->postJson('/api/sensor', sensorPayload(), ['x-api-key' => 'wrong'])->assertUnauthorized();
-
-    $this->assertDatabaseCount('sensor_data', 0);
-});
-
-test('invalid payloads return json validation errors even without an accept header', function () {
-    $response = $this->post('/api/sensor', ['soil_percent' => 500], ['x-api-key' => 'binus-iot-2025']);
-
-    $response->assertStatus(422)->assertJsonValidationErrors(['soil_percent', 'soil_raw', 'is_water_empty']);
-});
-
-test('float switch firmware can send a reading without water_raw', function () {
-    $payload = sensorPayload(['is_water_empty' => true, 'is_soil_dry' => false, 'pump_status' => false]);
-    unset($payload['water_raw'], $payload['lampu1_d25'], $payload['lampu2_d14']);
-
-    $this->postJson('/api/sensor', $payload, ['x-api-key' => 'binus-iot-2025'])
-        ->assertCreated()
-        ->assertJsonPath('water_raw', null)
-        ->assertJsonPath('is_water_empty', true)
-        ->assertJsonPath('lampu2_d14', true);
+test('the esp32 no longer posts readings over http because they arrive over mqtt', function () {
+    $this->postJson('/api/sensor', ['soil_percent' => 25])->assertMethodNotAllowed();
 });
 
 test('latest returns the newest reading', function () {
@@ -170,30 +101,4 @@ test('the default admin can log in after seeding', function () {
 
     $this->post(route('login'), ['email' => 'admin@binus.ac.id', 'password' => 'binus123'])
         ->assertRedirect(route('dashboard'));
-});
-
-test('esp32 can store dht air temperature and humidity', function () {
-    $this->postJson('/api/sensor', sensorPayload(['temperature' => 29.4, 'humidity' => 71]), ['x-api-key' => 'binus-iot-2025'])
-        ->assertCreated()
-        ->assertJsonPath('temperature', 29.4)
-        ->assertJsonPath('humidity', 71);
-
-    $this->assertDatabaseHas('sensor_data', ['temperature' => 29.4, 'humidity' => 71]);
-});
-
-test('a failed dht read sent as zeros is stored without temperature and humidity', function () {
-    $this->postJson('/api/sensor', sensorPayload(['temperature' => 0, 'humidity' => 0]), ['x-api-key' => 'binus-iot-2025'])
-        ->assertCreated()
-        ->assertJsonPath('temperature', null)
-        ->assertJsonPath('humidity', null);
-});
-
-test('readings without dht values are still accepted and impossible dht values are rejected', function () {
-    $this->postJson('/api/sensor', sensorPayload(), ['x-api-key' => 'binus-iot-2025'])
-        ->assertCreated()
-        ->assertJsonPath('temperature', null);
-
-    $this->postJson('/api/sensor', sensorPayload(['temperature' => 120, 'humidity' => 140]), ['x-api-key' => 'binus-iot-2025'])
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors(['temperature', 'humidity']);
 });

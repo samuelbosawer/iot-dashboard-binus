@@ -30,6 +30,7 @@ class SensorData extends Model
         'is_water_empty',
         'is_soil_dry',
         'pump_status',
+        'pump_command',
         'lampu1_d25',
         'lampu2_d14',
     ];
@@ -75,8 +76,8 @@ class SensorData extends Model
     }
 
     /**
-     * Human readable system status, matching the ESP32 firmware: the pump only runs when the
-     * float switch reports water AND the soil is below 30 %.
+     * Human readable system status, matching the ESP32 firmware: in auto mode the pump only runs
+     * when the float switch reports water AND the soil is below 35 %.
      */
     public function statusLabel(): string
     {

@@ -40,7 +40,7 @@ enum SensorDataset: string
     {
         return match ($this) {
             self::Soil => 'D34',
-            self::Water => 'D15',
+            self::Water => 'D13',
             self::Climate => 'D4',
             self::Pump => 'D23',
             self::LampD25 => 'D25',

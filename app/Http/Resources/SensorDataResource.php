@@ -28,6 +28,7 @@ class SensorDataResource extends JsonResource
             'is_water_empty' => $this->is_water_empty,
             'is_soil_dry' => $this->is_soil_dry,
             'pump_status' => $this->pump_status,
+            'pump_command' => $this->pump_command,
             'lampu1_d25' => $this->lampu1_d25,
             'lampu2_d14' => $this->lampu2_d14,
             'created_at' => $this->created_at?->toIso8601String(),

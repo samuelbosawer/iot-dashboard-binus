@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FilterSensorDataRequest;
-use App\Http\Requests\StoreSensorDataRequest;
 use App\Http\Resources\SensorDataResource;
 use App\Models\SensorData;
 use Illuminate\Http\JsonResponse;
@@ -31,18 +30,6 @@ class SensorController extends Controller
             ->withQueryString();
 
         return SensorDataResource::collection($readings);
-    }
-
-    /**
-     * Store a reading sent by the ESP32.
-     */
-    public function store(StoreSensorDataRequest $request): JsonResponse
-    {
-        $sensorData = SensorData::create($request->validated());
-
-        return SensorDataResource::make($sensorData)
-            ->response()
-            ->setStatusCode(201);
     }
 
     /**
