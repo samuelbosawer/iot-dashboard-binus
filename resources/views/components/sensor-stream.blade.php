@@ -40,6 +40,34 @@
             };
         };
 
+        const PUMP_STATES = {
+            manual_on: { label: 'Manual ON', text: 'Pompa dinyalakan manual dari dashboard dan terus menyala sampai diganti.', icon: 'fa-hand-pointer', badge: 'bg-emerald-100 text-emerald-700', solid: 'bg-emerald-500 text-white' },
+            manual_on_empty: { label: 'Manual ON', text: 'Pompa menyala manual padahal air tandon habis. Pompa bisa rusak, matikan segera!', icon: 'fa-triangle-exclamation', badge: 'bg-red-100 text-red-700', solid: 'bg-red-500 text-white' },
+            manual_off: { label: 'Manual OFF', text: 'Pompa dimatikan manual, penyiraman otomatis tidak berjalan.', icon: 'fa-ban', badge: 'bg-slate-200 text-slate-700', solid: 'bg-slate-500 text-white' },
+            watering: { label: 'Menyiram', text: 'Penyiraman otomatis sedang berjalan (±8 detik).', icon: 'fa-faucet-drip', badge: 'bg-emerald-100 text-emerald-700', solid: 'bg-emerald-500 text-white' },
+            empty: { label: 'Air Habis', text: 'Air tandon habis, pompa dikunci OFF sampai tandon diisi.', icon: 'fa-triangle-exclamation', badge: 'bg-red-100 text-red-700', solid: 'bg-red-500 text-white' },
+            waiting: { label: 'Kering - Tunggu Jeda', text: 'Tanah kering, menunggu jadwal siram berikutnya (maks. sekali tiap 2 jam).', icon: 'fa-hourglass-half', badge: 'bg-amber-100 text-amber-700', solid: 'bg-amber-400 text-white' },
+            ok: { label: 'Aman - Basah', text: 'Tanah cukup basah dan air tersedia, pompa standby.', icon: 'fa-circle-check', badge: 'bg-sky-100 text-sky-700', solid: 'bg-emerald-500 text-white' },
+        };
+
+        /**
+         * What the pump is really doing. A dry soil alone does not mean watering: auto mode waters
+         * 8 s at most once every 2 hours. Mirrors App\Models\SensorData::statusLabel().
+         */
+        const pumpState = (d) => {
+            const key = d.pump_command === 'pump_on' ? (d.is_water_empty ? 'manual_on_empty' : 'manual_on')
+                : d.pump_command === 'pump_off' ? 'manual_off'
+                : d.pump_status ? 'watering'
+                : d.is_water_empty ? 'empty'
+                : d.is_soil_dry ? 'waiting'
+                : 'ok';
+
+            return { key, ...PUMP_STATES[key] };
+        };
+
+        const PUMP_MODES = { auto: 'Otomatis', pump_on: 'Manual ON', pump_off: 'Manual OFF' };
+        const pumpModeLabel = (command) => PUMP_MODES[command] ?? command ?? '--';
+
         /**
          * handlers.onReading(row) gets each live reading; handlers.onStatus(state) gets 'connecting', 'connected' or 'offline'.
          */
@@ -78,6 +106,6 @@
             return client;
         };
 
-        return { connect, normalize };
+        return { connect, normalize, pumpState, pumpModeLabel };
     })();
 </script>

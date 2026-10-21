@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\PumpCommand;
 use App\Models\SensorData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
@@ -277,8 +278,16 @@ class PredictionController extends Controller
             $items[] = ['icon' => 'fa-wifi', 'tone' => 'amber', 'title' => 'Perangkat tidak mengirim data', 'text' => 'Data terakhir diterima '.$latest->created_at->diffForHumans().'. Periksa daya dan koneksi WiFi ESP32.'];
         }
 
-        if ($latest->is_soil_dry && ! $latest->is_water_empty) {
-            $items[] = ['icon' => 'fa-faucet-drip', 'tone' => 'brand', 'title' => 'Penyiraman sedang berjalan', 'text' => "Kelembaban tanah {$latest->soil_percent}% (di bawah ".self::SOIL_DRY_PERCENT.'%). Pastikan selang tidak tersumbat dan air mengalir ke tanaman.'];
+        if ($latest->pump_command === PumpCommand::On->value) {
+            $items[] = $latest->is_water_empty
+                ? ['icon' => 'fa-triangle-exclamation', 'tone' => 'red', 'title' => 'Pompa menyala manual saat air habis', 'text' => 'Pompa bisa rusak karena berjalan tanpa air. Kembalikan ke mode Otomatis atau Manual OFF dari dashboard.']
+                : ['icon' => 'fa-hand-pointer', 'tone' => 'amber', 'title' => 'Pompa menyala manual', 'text' => 'Pompa terus menyala sampai dikirim perintah Otomatis atau Manual OFF dari dashboard.'];
+        } elseif ($latest->pump_command === PumpCommand::Off->value && $latest->is_soil_dry) {
+            $items[] = ['icon' => 'fa-ban', 'tone' => 'amber', 'title' => 'Penyiraman otomatis dimatikan', 'text' => "Tanah kering ({$latest->soil_percent}%) tetapi pompa di mode Manual OFF. Kembalikan ke mode Otomatis agar tanaman disiram."];
+        } elseif ($latest->pump_status) {
+            $items[] = ['icon' => 'fa-faucet-drip', 'tone' => 'brand', 'title' => 'Penyiraman sedang berjalan', 'text' => "Kelembaban tanah {$latest->soil_percent}%. Pastikan selang tidak tersumbat dan air mengalir ke tanaman."];
+        } elseif ($latest->is_soil_dry && ! $latest->is_water_empty) {
+            $items[] = ['icon' => 'fa-hourglass-half', 'tone' => 'brand', 'title' => 'Menunggu jadwal siram', 'text' => "Tanah kering ({$latest->soil_percent}%, di bawah ".self::SOIL_DRY_PERCENT.'%). Mode otomatis menyiram 8 detik paling sering sekali tiap 2 jam.'];
         }
 
         if ($trend['hours_until_dry'] !== null && $trend['hours_until_dry'] <= 12) {

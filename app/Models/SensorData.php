@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PumpCommand;
 use Database\Factories\SensorDataFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -76,15 +77,27 @@ class SensorData extends Model
     }
 
     /**
-     * Human readable system status, matching the ESP32 firmware: in auto mode the pump only runs
-     * when the float switch reports water AND the soil is below 35 %.
+     * What the pump was really doing, matching the ESP32 firmware. A dry soil alone does not mean
+     * watering: in auto mode the pump runs 8 s at most once every 2 hours, so between runs it waits.
+     * Mirrors SensorStream.pumpState() in resources/views/components/sensor-stream.blade.php.
      */
     public function statusLabel(): string
     {
         return match (true) {
+            $this->pump_command === PumpCommand::On->value => 'Manual ON',
+            $this->pump_command === PumpCommand::Off->value => 'Manual OFF',
+            $this->pump_status => 'Menyiram',
             $this->is_water_empty => 'Air Habis',
-            $this->is_soil_dry => 'Siram ON',
+            $this->is_soil_dry => 'Kering - Tunggu Jeda',
             default => 'Aman - Basah',
         };
+    }
+
+    /**
+     * Pump mode reported by the firmware, e.g. "Otomatis"; null for readings stored before MQTT.
+     */
+    public function pumpModeLabel(): ?string
+    {
+        return $this->pump_command === null ? null : (PumpCommand::tryFrom($this->pump_command)?->label() ?? $this->pump_command);
     }
 }

@@ -43,7 +43,7 @@ test('csv only contains the selected datasets within the date range, oldest firs
         ->and($rows[1][2])->toBe('22')
         ->and($rows[2][2])->toBe('15')
         ->and($rows[2][4])->toBe('1')
-        ->and($rows[2][5])->toBe('Siram ON');
+        ->and($rows[2][5])->toBe('Menyiram');
 });
 
 test('csv can be filtered by status and keeps the canonical column order', function () {
@@ -101,4 +101,30 @@ test('csv can include dht air temperature and humidity', function () {
     expect($rows[0])->toBe(['id', 'waktu', 'suhu_c', 'kelembaban_udara'])
         ->and(array_slice($rows[1], 2))->toBe(['28.5', '65'])
         ->and(array_slice($rows[2], 2))->toBe(['', '']);
+});
+
+test('the status column reports what the pump really did, not just a dry soil', function (array $attributes, string $expected) {
+    expect(SensorData::factory()->make($attributes)->statusLabel())->toBe($expected);
+})->with([
+    'dry soil waiting for the 2 hour pause' => [['is_soil_dry' => true, 'pump_status' => false, 'pump_command' => 'auto'], 'Kering - Tunggu Jeda'],
+    'auto watering' => [['is_soil_dry' => true, 'pump_status' => true, 'pump_command' => 'auto'], 'Menyiram'],
+    'manual on' => [['pump_status' => true, 'pump_command' => 'pump_on'], 'Manual ON'],
+    'manual off with dry soil' => [['is_soil_dry' => true, 'pump_status' => false, 'pump_command' => 'pump_off'], 'Manual OFF'],
+    'tank empty' => [['is_water_empty' => true, 'is_soil_dry' => true, 'pump_status' => false, 'pump_command' => 'auto'], 'Air Habis'],
+    'wet soil' => [['pump_command' => 'auto'], 'Aman - Basah'],
+]);
+
+test('the pump csv dataset includes the pump mode', function () {
+    SensorData::factory()->create(['pump_status' => true, 'pump_command' => 'pump_on']);
+    SensorData::factory()->create(['pump_command' => null]);
+
+    $response = $this->actingAs(User::factory()->create())
+        ->get(route('sensor.export', ['datasets' => ['pump']]))
+        ->assertOk();
+
+    $rows = csvRows($response->streamedContent());
+
+    expect($rows[0])->toBe(['id', 'waktu', 'pompa_d23', 'mode_pompa'])
+        ->and(array_slice($rows[1], 2))->toBe(['1', 'Manual ON'])
+        ->and(array_slice($rows[2], 2))->toBe(['0', '']);
 });

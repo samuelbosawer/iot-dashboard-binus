@@ -1,7 +1,3 @@
-@php
-    $pumpLabels = collect($pumpCommands)->mapWithKeys(fn ($command) => [$command->value => $command->label()]);
-@endphp
-
 <x-layouts.app title="Dashboard">
     {{-- Hero --}}
     <section class="relative mb-6 overflow-hidden rounded-3xl bg-linear-to-br from-brand-600 via-brand-700 to-brand-900 p-6 text-white shadow-lg sm:p-8">
@@ -92,7 +88,7 @@
                     <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-50 text-sky-600"><i class="fa-solid fa-water"></i></span>
                     <div>
                         <p class="text-sm font-semibold text-slate-900">Water Level Float Switch</p>
-                        <p class="text-xs text-slate-400">Pelampung tandon · Pin D13 (LOW = air habis)</p>
+                        <p class="text-xs text-slate-400">Pelampung tandon · Pin D15 (LOW = air habis)</p>
                     </div>
                 </div>
                 <span id="water-badge" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">--</span>
@@ -233,7 +229,7 @@
                 <span id="lamp-d14-icon" class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xl text-slate-400 transition"><i class="fa-solid fa-lightbulb"></i></span>
                 <div class="min-w-0 flex-1">
                     <p class="text-sm font-semibold text-slate-900">Lampu Indikator 2</p>
-                    <p class="text-xs text-slate-400">Pin D14 · Menyala saat air habis</p>
+                    <p class="text-xs text-slate-400">Pin D14 · Menyala saat air habis · buzzer D13</p>
                 </div>
                 <span id="lamp-d14-state" class="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-500">--</span>
             </div>
@@ -349,7 +345,7 @@
                     <select id="export-status" name="status" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none">
                         <option value="">Semua status</option>
                         <option value="ok" @selected(old('status') === 'ok')>Aman - Basah</option>
-                        <option value="dry" @selected(old('status') === 'dry')>Siram ON (tanah kering)</option>
+                        <option value="dry" @selected(old('status') === 'dry')>Tanah kering</option>
                         <option value="empty" @selected(old('status') === 'empty')>Air Habis</option>
                     </select>
                 </div>
@@ -395,7 +391,7 @@
                     <select id="filter-status" name="status" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none">
                         <option value="">Semua status</option>
                         <option value="ok">Aman - Basah</option>
-                        <option value="dry">Siram ON (tanah kering)</option>
+                        <option value="dry">Tanah kering</option>
                         <option value="empty">Air Habis</option>
                     </select>
                 </div>
@@ -421,6 +417,7 @@
                         <th class="px-4 py-3 font-medium">Suhu</th>
                         <th class="px-4 py-3 font-medium">Udara %</th>
                         <th class="px-4 py-3 font-medium">Pompa</th>
+                        <th class="px-4 py-3 font-medium">Mode</th>
                         <th class="px-4 py-3 font-medium">D25</th>
                         <th class="px-4 py-3 font-medium">D14</th>
                         <th class="px-4 py-3 font-medium">Status</th>
@@ -453,7 +450,6 @@
             (() => {
                 const HISTORY_URL = @json(url('/api/sensor/history'));
                 const RECORDS_URL = @json(url('/api/sensor'));
-                const PUMP_LABELS = @json($pumpLabels);
                 const CLOCK_TICK_MS = 5000;
                 // Give `php artisan mqtt:listen` a moment to store the reading before the table reloads.
                 const TABLE_REFRESH_DELAY_MS = 2000;
@@ -477,35 +473,14 @@
                 const ICON_TILE = 'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xl transition ';
                 const OFF = 'bg-slate-100 text-slate-500';
 
-                const STATUS = {
-                    empty: {
-                        icon: 'bg-red-500 text-white',
-                        iconClass: 'fa-triangle-exclamation',
-                        label: 'ALERT: Air Habis',
-                        text: 'Float switch D13 mendeteksi air habis. Pompa D23 dikunci OFF (mode otomatis), lampu D14 menyala.',
-                        badge: 'bg-red-100 text-red-700',
-                    },
-                    dry: {
-                        icon: 'bg-amber-400 text-white',
-                        iconClass: 'fa-seedling',
-                        label: 'Siram ON',
-                        text: 'Tanah kering (< 35%) dan air tersedia. Pompa D23 menyiram 8 detik (jeda 2 jam), lampu D25 menyala.',
-                        badge: 'bg-amber-100 text-amber-700',
-                    },
-                    ok: {
-                        icon: 'bg-emerald-500 text-white',
-                        iconClass: 'fa-circle-check',
-                        label: 'Aman - Basah',
-                        text: 'Tanah cukup basah (≥ 35%) dan air tersedia. Pompa D23 mati.',
-                        badge: 'bg-emerald-100 text-emerald-700',
-                    },
-                };
+                /** Labels of the history filter (soil / tank condition, not what the pump did). */
+                const FILTER_LABELS = { ok: 'Aman - Basah', dry: 'Tanah kering', empty: 'Air habis' };
+                const { pumpState, pumpModeLabel } = window.SensorStream;
 
                 const $ = (id) => document.getElementById(id);
                 const setText = (id, value) => { $(id).textContent = value; };
                 const setClass = (id, classes) => { $(id).className = classes; };
                 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-                const statusKey = (d) => (d.is_water_empty ? 'empty' : d.is_soil_dry ? 'dry' : 'ok');
                 // The float switch is on/off only, so the tank drawing shows "full enough" or "empty".
                 const waterLevel = (d) => (d.is_water_empty ? 8 : 75);
                 const formatDecimal = (value) => Number(value).toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -578,12 +553,12 @@
                 };
 
                 const renderLatest = (d) => {
-                    const s = STATUS[statusKey(d)];
+                    const state = pumpState(d);
 
-                    setClass('status-icon', 'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl shadow-md ' + s.icon);
-                    $('status-icon').innerHTML = '<i class="fa-solid ' + s.iconClass + ' text-xl"></i>';
-                    setText('status-title', s.label);
-                    setText('status-text', s.text);
+                    setClass('status-icon', 'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl shadow-md ' + state.solid);
+                    $('status-icon').innerHTML = '<i class="fa-solid ' + state.icon + ' text-xl"></i>';
+                    setText('status-title', state.label);
+                    setText('status-text', state.text + ' Tanah ' + d.soil_percent + '% · air ' + (d.is_water_empty ? 'habis' : 'tersedia') + ' · mode ' + pumpModeLabel(d.pump_command) + '.');
 
                     setText('soil-percent', d.soil_percent);
                     setText('soil-raw', d.soil_raw);
@@ -602,16 +577,10 @@
 
                     setText('pump-status', d.pump_status ? 'ON' : 'OFF');
                     setClass('pump-status', 'text-4xl font-bold ' + (d.pump_status ? 'text-emerald-600' : 'text-slate-400'));
-                    setText('pump-text', d.pump_command === 'pump_on'
-                        ? 'Manual ON dari dashboard'
-                        : d.pump_command === 'pump_off'
-                            ? 'Manual OFF dari dashboard'
-                            : d.pump_status
-                                ? 'Menyiram: air ada & tanah < 35%'
-                                : d.is_water_empty ? 'Dikunci OFF karena air habis' : 'Mati, tanah cukup basah');
+                    setText('pump-text', state.text);
                     renderPumpMode(d.pump_command);
-                    setText('pump-badge', d.pump_status ? 'Menyiram' : d.is_water_empty ? 'Terkunci' : 'Standby');
-                    setClass('pump-badge', PILL + (d.pump_status ? 'bg-emerald-100 text-emerald-700' : OFF));
+                    setText('pump-badge', state.label);
+                    setClass('pump-badge', PILL + state.badge);
                     setClass('pump-icon', 'flex h-11 w-11 items-center justify-center rounded-xl transition ' + (d.pump_status ? 'animate-pulse bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'));
 
                     renderLamp('lamp-d25', d.lampu1_d25, 'bg-amber-400 text-white shadow-lg shadow-amber-400/50');
@@ -621,10 +590,11 @@
                 };
 
                 const renderPumpMode = (command) => {
-                    setText('pump-mode', PUMP_LABELS[command] ?? command ?? '--');
+                    setText('pump-mode', pumpModeLabel(command));
                     document.querySelectorAll('[data-pump-command]').forEach((button) => {
                         button.toggleAttribute('data-active', button.dataset.pumpCommand === command);
                     });
+                    confirmPumpCommand(command);
                 };
 
                 const renderDht = (d) => {
@@ -807,7 +777,7 @@
                                     },
                                     afterBody: (items) => {
                                         const d = rows[items[0].dataIndex];
-                                        return d ? ['', 'Status: ' + STATUS[statusKey(d)].label.replace('ALERT: ', '')] : [];
+                                        return d ? ['', 'Status: ' + pumpState(d).label, 'Mode: ' + pumpModeLabel(d.pump_command)] : [];
                                     },
                                 },
                             },
@@ -1002,7 +972,7 @@
                     $('history-empty').classList.toggle('hidden', records.length > 0);
 
                     records.forEach((d) => {
-                        const s = STATUS[statusKey(d)];
+                        const s = pumpState(d);
                         const tr = document.createElement('tr');
                         tr.className = 'transition-colors duration-1000 hover:bg-slate-50' + (highlightIds.has(d.id) ? ' bg-brand-50' : '');
                         tr.append(
@@ -1013,6 +983,7 @@
                             cell(d.temperature === null ? '--' : formatDecimal(d.temperature) + ' °C'),
                             cell(d.humidity === null ? '--' : formatDecimal(d.humidity) + '%'),
                             onOffCell(d.pump_status),
+                            cell(d.pump_command ? pumpModeLabel(d.pump_command) : '--', 'whitespace-nowrap px-4 py-3 text-slate-600'),
                             onOffCell(d.lampu1_d25),
                             onOffCell(d.lampu2_d14),
                         );
@@ -1021,7 +992,8 @@
                         statusCell.className = 'px-4 py-3';
                         const badge = document.createElement('span');
                         badge.className = PILL + s.badge;
-                        badge.textContent = s.label.replace('ALERT: ', '');
+                        badge.textContent = s.label;
+                        badge.title = s.text;
                         statusCell.append(badge);
                         tr.append(statusCell);
 
@@ -1039,7 +1011,7 @@
                         parts.push((filters.date_from || '…') + ' s/d ' + (filters.date_to || '…'));
                     }
                     if (filters.status) {
-                        parts.push(STATUS[filters.status].label.replace('ALERT: ', ''));
+                        parts.push(FILTER_LABELS[filters.status]);
                     }
                     return parts.length ? 'Filter: ' + parts.join(' · ') : 'Semua data, terbaru di atas';
                 };
@@ -1181,30 +1153,66 @@
 
                 /* ---------- Pump control over MQTT ---------- */
 
+                const PUMP_CONFIRM_TIMEOUT_MS = 20000;
                 const pumpForm = $('pump-form');
+                const pumpButtons = [...pumpForm.querySelectorAll('[data-pump-command]')];
+                let pendingCommand = null;
+                let pendingTimer = null;
+
+                const setPumpFeedback = (text, tone) => {
+                    setText('pump-feedback', text);
+                    setClass('pump-feedback', 'mt-2 text-xs ' + tone);
+                };
+
+                const clearPending = () => {
+                    pendingCommand = null;
+                    clearTimeout(pendingTimer);
+                    pumpButtons.forEach((button) => button.classList.remove('animate-pulse'));
+                };
+
+                /**
+                 * The ESP32 publishes right after it applies a command, so the first reading carrying
+                 * the requested mode is the confirmation.
+                 */
+                const confirmPumpCommand = (command) => {
+                    if (pendingCommand && command === pendingCommand) {
+                        setPumpFeedback('✓ ESP32 sudah menjalankan mode ' + pumpModeLabel(command) + '.', 'text-emerald-600');
+                        clearPending();
+                    }
+                };
 
                 pumpForm.addEventListener('submit', async (event) => {
                     event.preventDefault();
 
-                    const buttons = [...pumpForm.querySelectorAll('[data-pump-command]')];
+                    const button = event.submitter;
                     const body = new FormData(pumpForm);
-                    body.set('command', event.submitter.value);
-                    buttons.forEach((button) => { button.disabled = true; });
+                    body.set('command', button.value);
+                    clearPending();
+                    pumpButtons.forEach((item) => { item.disabled = true; });
+                    setPumpFeedback('Mengirim perintah ' + pumpModeLabel(button.value) + '…', 'text-slate-500');
 
                     try {
                         const response = await fetch(pumpForm.action, { method: 'POST', headers: { Accept: 'application/json' }, body });
-                        const result = await response.json();
+                        const result = await response.json().catch(() => ({}));
+
                         if (!response.ok) {
-                            throw new Error(result.message || 'Gagal mengirim perintah.');
+                            const fallback = response.status === 419 ? 'Sesi login kedaluwarsa, muat ulang halaman.'
+                                : response.status === 429 ? 'Terlalu banyak perintah, tunggu sebentar.'
+                                : 'Gagal mengirim perintah (HTTP ' + response.status + ').';
+                            throw new Error(result.message || fallback);
                         }
 
-                        setText('pump-feedback', result.message + ' Menunggu konfirmasi dari data berikutnya…');
-                        setClass('pump-feedback', 'mt-2 text-xs text-emerald-600');
+                        pendingCommand = button.value;
+                        button.classList.add('animate-pulse');
+                        setPumpFeedback('Perintah terkirim ke broker, menunggu konfirmasi ESP32…', 'text-brand-600');
+                        pendingTimer = setTimeout(() => {
+                            setPumpFeedback('Belum ada konfirmasi dari ESP32. Pastikan perangkat online dan firmware terbaru sudah di-upload.', 'text-amber-600');
+                            clearPending();
+                        }, PUMP_CONFIRM_TIMEOUT_MS);
                     } catch (error) {
-                        setText('pump-feedback', error.message);
-                        setClass('pump-feedback', 'mt-2 text-xs text-red-600');
+                        setPumpFeedback(error.message, 'text-red-600');
                     } finally {
-                        buttons.forEach((button) => { button.disabled = false; });
+                        pumpButtons.forEach((item) => { item.disabled = false; });
                     }
                 });
 

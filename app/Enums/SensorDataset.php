@@ -40,7 +40,7 @@ enum SensorDataset: string
     {
         return match ($this) {
             self::Soil => 'D34',
-            self::Water => 'D13',
+            self::Water => 'D15',
             self::Climate => 'D4',
             self::Pump => 'D23',
             self::LampD25 => 'D25',
@@ -55,7 +55,7 @@ enum SensorDataset: string
             self::Soil => 'soil_percent, soil_raw, tanah_kering',
             self::Water => 'status_air, air_habis',
             self::Climate => 'suhu_c, kelembaban_udara',
-            self::Pump => 'pompa_d23',
+            self::Pump => 'pompa_d23, mode_pompa',
             self::LampD25 => 'lampu_d25',
             self::LampD14 => 'lampu_d14',
             self::Status => 'status',
@@ -85,6 +85,7 @@ enum SensorDataset: string
             ],
             self::Pump => [
                 'pompa_d23' => fn (SensorData $reading): int => (int) $reading->pump_status,
+                'mode_pompa' => fn (SensorData $reading): ?string => $reading->pumpModeLabel(),
             ],
             self::LampD25 => [
                 'lampu_d25' => fn (SensorData $reading): int => (int) $reading->lampu1_d25,

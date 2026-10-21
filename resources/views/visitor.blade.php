@@ -161,7 +161,7 @@
                 <div class="flex items-center gap-3">
                     <span id="v-pump-icon" class="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400 transition"><i class="fa-solid fa-faucet-drip"></i></span>
                     <div>
-                        <p class="text-sm font-semibold text-slate-900">Pompa Penyiram</p>
+                        <p class="text-sm font-semibold text-slate-900">Pompa Penyiram <span id="v-pump-mode" class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">--</span></p>
                         <p id="v-pump-text" class="text-xs text-slate-500">Menunggu data</p>
                     </div>
                 </div>
@@ -223,7 +223,7 @@
                     <ul class="mt-5 space-y-3 text-sm">
                         @foreach ([
                             ['label' => 'Aman - Basah', 'count' => $summary['ok'], 'percent' => $summary['ok_percent'], 'dot' => 'bg-emerald-500'],
-                            ['label' => 'Siram ON', 'count' => $summary['dry'], 'percent' => $summary['dry_percent'], 'dot' => 'bg-amber-400'],
+                            ['label' => 'Tanah Kering', 'count' => $summary['dry'], 'percent' => $summary['dry_percent'], 'dot' => 'bg-amber-400'],
                             ['label' => 'Air Habis', 'count' => $summary['empty'], 'percent' => $summary['empty_percent'], 'dot' => 'bg-red-500'],
                         ] as $status)
                             <li class="flex items-center justify-between">
@@ -308,7 +308,7 @@
                         <select id="v-table-status" name="status" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none">
                             <option value="">Semua status</option>
                             <option value="ok">Aman - Basah</option>
-                            <option value="dry">Siram ON</option>
+                            <option value="dry">Tanah kering</option>
                             <option value="empty">Air Habis</option>
                         </select>
                     </div>
@@ -334,6 +334,7 @@
                                 <th class="px-4 py-3 font-medium">Suhu</th>
                                 <th class="px-4 py-3 font-medium">Kelembaban Udara</th>
                                 <th class="px-4 py-3 font-medium">Pompa</th>
+                                <th class="px-4 py-3 font-medium">Mode</th>
                                 <th class="px-4 py-3 font-medium">Status</th>
                             </tr>
                         </thead>
@@ -502,18 +503,14 @@
 
                 /* ---------- Live cards ---------- */
 
-                const STATUS = {
-                    empty: { label: 'Air Habis', live: 'Air tandon habis' },
-                    dry: { label: 'Siram ON', live: 'Sedang menyiram' },
-                    ok: { label: 'Aman - Basah', live: 'Tanaman sehat' },
-                };
-                const statusKey = (d) => (d.is_water_empty ? 'empty' : d.is_soil_dry ? 'dry' : 'ok');
+                const { pumpState, pumpModeLabel } = window.SensorStream;
 
                 const temperatureLabel = (t) => (t < 20 ? 'Sejuk' : t <= 30 ? 'Normal' : t <= 35 ? 'Hangat' : 'Panas');
                 const humidityLabel = (h) => (h < 40 ? 'Udara kering' : h <= 70 ? 'Ideal' : 'Udara lembab');
 
                 const renderLatest = (d) => {
-                    setText('v-hero-status', STATUS[statusKey(d)].live);
+                    const state = pumpState(d);
+                    setText('v-hero-status', state.label);
 
                     setText('v-soil', d.soil_percent);
                     $('v-soil-gauge').style.strokeDashoffset = GAUGE_CIRCUMFERENCE * (1 - clamp(d.soil_percent, 0, 100) / 100);
@@ -537,7 +534,8 @@
                         setText('v-hum-label', 'Sensor DHT tidak terbaca');
                     }
 
-                    setText('v-pump-text', d.pump_status ? 'Pompa sedang menyiram tanaman' : 'Pompa dalam posisi standby');
+                    setText('v-pump-text', state.text);
+                    setText('v-pump-mode', pumpModeLabel(d.pump_command));
                     setText('v-pump-badge', d.pump_status ? 'ON' : 'OFF');
                     $('v-pump-badge').className = 'rounded-full px-3 py-1 text-sm font-bold ' + (d.pump_status ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500');
                     $('v-pump-icon').className = 'flex h-11 w-11 items-center justify-center rounded-xl transition ' + (d.pump_status ? 'animate-pulse bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400');
@@ -657,11 +655,6 @@
 
                 /* ---------- Data table ---------- */
 
-                const STATUS_BADGES = {
-                    empty: 'bg-red-100 text-red-700',
-                    dry: 'bg-amber-100 text-amber-700',
-                    ok: 'bg-emerald-100 text-emerald-700',
-                };
                 const tableFilters = { date_from: '', date_to: '', status: '' };
                 let tablePage = 1;
 
@@ -693,8 +686,8 @@
                     time.className = 'text-xs font-medium text-slate-500';
                     time.textContent = d.created_at_label;
                     const badge = document.createElement('span');
-                    badge.className = 'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ' + STATUS_BADGES[statusKey(d)];
-                    badge.textContent = STATUS[statusKey(d)].label;
+                    badge.className = 'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ' + pumpState(d).badge;
+                    badge.textContent = pumpState(d).label;
                     head.append(time, badge);
 
                     const stats = document.createElement('dl');
@@ -746,7 +739,8 @@
                                 tableCell(d.temperature === null ? '--' : number(d.temperature) + ' °C'),
                                 tableCell(d.humidity === null ? '--' : Math.round(d.humidity) + '%'),
                                 badgeCell(d.pump_status ? 'ON' : 'OFF', d.pump_status ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'),
-                                badgeCell(STATUS[statusKey(d)].label, STATUS_BADGES[statusKey(d)]),
+                                tableCell(d.pump_command ? pumpModeLabel(d.pump_command) : '--', 'whitespace-nowrap px-4 py-3 text-slate-600'),
+                                badgeCell(pumpState(d).label, pumpState(d).badge),
                             );
                             return tr;
                         }));

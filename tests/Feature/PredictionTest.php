@@ -62,3 +62,17 @@ test('recommendations warn when the tank is empty and dht data is missing', func
     expect($titles)->toContain('Isi tandon sekarang', 'Data suhu belum masuk', 'Lanjutkan pengumpulan data')
         ->not->toContain('Kondisi stabil');
 });
+
+test('recommendations follow the real pump state instead of assuming a dry soil is being watered', function (array $attributes, string $expected, string $unexpected) {
+    SensorData::factory()->create($attributes);
+
+    $this->get(route('prediction'))
+        ->assertOk()
+        ->assertSee($expected)
+        ->assertDontSee($unexpected);
+})->with([
+    'auto mode between waterings' => [['soil_percent' => 20, 'is_soil_dry' => true, 'pump_status' => false, 'pump_command' => 'auto'], 'Menunggu jadwal siram', 'Penyiraman sedang berjalan'],
+    'auto mode watering' => [['soil_percent' => 20, 'is_soil_dry' => true, 'pump_status' => true, 'pump_command' => 'auto'], 'Penyiraman sedang berjalan', 'Menunggu jadwal siram'],
+    'manual off with dry soil' => [['soil_percent' => 20, 'is_soil_dry' => true, 'pump_status' => false, 'pump_command' => 'pump_off'], 'Penyiraman otomatis dimatikan', 'Penyiraman sedang berjalan'],
+    'manual on with an empty tank' => [['is_water_empty' => true, 'pump_status' => true, 'pump_command' => 'pump_on'], 'Pompa menyala manual saat air habis', 'Menunggu jadwal siram'],
+]);

@@ -2,7 +2,7 @@
 
 Monitoring tanaman dan penyiraman otomatis berbasis **ESP32 + MQTT**, dengan dashboard web **Laravel 12**.
 
-ESP32 membaca kelembaban tanah, float switch tandon, dan suhu/kelembaban udara (DHT11), lalu mengirim datanya ke broker MQTT setiap 10 detik. Website menampilkan data secara realtime, menyimpan riwayatnya, dan bisa mengirim perintah pompa balik ke ESP32.
+ESP32 membaca kelembaban tanah, float switch tandon, dan suhu/kelembaban udara (DHT11), lalu mengirim datanya ke broker MQTT setiap 10 detik, dan langsung saat pompa, mode, atau tandon berubah. Website menampilkan data secara realtime, menyimpan riwayatnya, dan bisa mengirim perintah pompa balik ke ESP32.
 
 - **Halaman publik** (`/`): data live, laporan, grafik, tabel, dan download CSV.
 - **Prediksi** (`/prediksi`): tren kelembaban tanah dan rekomendasi perawatan.
@@ -119,11 +119,12 @@ Install lewat **Library Manager**: `PubSubClient`, `ArduinoJson` (v7), `DHT sens
 | Komponen | Pin ESP32 |
 |---|---|
 | Soil moisture (kapasitif) | D34 (ADC) |
-| Float switch tandon | D13 (`INPUT_PULLUP`, LOW = air habis) |
+| Float switch tandon | D15 (`INPUT_PULLUP`, LOW = air habis) |
 | DHT11 | D4 |
 | Relay pompa | D23 (aktif LOW) |
 | Lampu indikator 1 | D25 (menyala saat pompa ON) |
 | Lampu indikator 2 | D14 (menyala saat air habis) |
+| Buzzer | D13 (bunyi 3× tiap 5 detik saat air habis **dan** tanah kering) |
 | OLED SSD1306 | SDA 32, SCL 27, alamat `0x3C` |
 
 ### Yang perlu diatur sebelum upload
@@ -153,9 +154,23 @@ Parameter lain yang sering disesuaikan:
 | `pump_on` | Pompa menyala **terus** sampai dikirim `auto` atau `pump_off` |
 | `pump_off` | Pompa mati, penyiraman otomatis berhenti |
 
+Setelah tombol pompa ditekan, dashboard menampilkan *"menunggu konfirmasi ESP32…"* sampai ESP32 mengirim data dengan mode baru. Jika dalam 20 detik tidak ada konfirmasi, perangkat kemungkinan offline.
+
+### Status yang ditampilkan di dashboard dan riwayat data
+
+| Status | Kondisi |
+|---|---|
+| **Manual ON** / **Manual OFF** | Mode pompa diatur dari dashboard |
+| **Menyiram** | Mode otomatis, pompa sedang menyala |
+| **Air Habis** | Tandon kosong, pompa dikunci OFF |
+| **Kering - Tunggu Jeda** | Tanah kering, tetapi penyiraman berikutnya menunggu jeda 2 jam |
+| **Aman - Basah** | Tanah cukup basah, pompa standby |
+
+Filter status di tabel riwayat (Aman - Basah / Tanah kering / Air habis) menyaring berdasarkan kondisi tanah dan tandon.
+
 ### Format pesan sensor
 
-Dikirim ke `binus/garden/sensor/data` setiap 10 detik:
+Dikirim ke `binus/garden/sensor/data` setiap 10 detik, **dan langsung** (maks. 1× per detik) saat pompa ON/OFF, mode pompa, atau status tandon berubah. Tanpa kiriman langsung ini, siram otomatis yang hanya 8 detik bisa terjadi di antara dua kiriman dan tidak tercatat, dan tombol pompa di dashboard baru terkonfirmasi sampai 10 detik kemudian.
 
 ```json
 {
