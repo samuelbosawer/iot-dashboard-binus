@@ -19,6 +19,22 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Stores ESP32 readings. Runs as its own service so it survives closed SSH sessions and reboots.
+  mqtt:
+    image: iot-dashboard-binus-app
+    container_name: iot-mqtt
+    command: ["php", "artisan", "mqtt:listen"]
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      app:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    restart: unless-stopped
+
   mysql:
     image: mysql:8.0
     container_name: iot-mysql

@@ -115,12 +115,15 @@ Data MySQL dan InfluxDB disimpan di volume Docker (`mysql_data`, `influxdb_data`
 > **Port 8000 dan 3306 harus kosong.** Matikan dulu `php artisan serve` dan MySQL XAMPP sebelum `docker compose up`.
 
 ```bash
-docker compose up --build -d                          # build image + jalankan 3 service
+docker compose up --build -d                          # build image + jalankan semua service
 docker compose exec app composer install
 docker compose exec app php artisan key:generate      # hanya jika APP_KEY di .env masih kosong
 docker compose exec app php artisan migrate --seed
-docker compose exec app php artisan mqtt:listen       # simpan data ESP32 (biarkan terminal terbuka)
+docker compose restart mqtt                           # listener ESP32 mulai menyimpan data
+docker compose logs -f mqtt                           # cek data yang masuk
 ```
+
+Listener MQTT (`php artisan mqtt:listen`) berjalan otomatis di service `mqtt` dan restart sendiri, jadi data tetap tersimpan walau SSH ke VPS ditutup. Jangan jalankan `mqtt:listen` manual lagi.
 
 - Website: http://localhost:8000 · Cek koneksi InfluxDB: http://localhost:8000/test-influx (hanya di luar production)
 - InfluxDB UI: http://localhost:8086, login `admin` / `BinusIoT123!`, org `binus`, bucket `iot_sensors`
