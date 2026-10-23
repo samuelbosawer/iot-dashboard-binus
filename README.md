@@ -2,7 +2,7 @@
 
 Monitoring tanaman dan penyiraman otomatis berbasis **ESP32 + MQTT**, dengan dashboard web **Laravel 12**.
 
-ESP32 membaca kelembaban tanah, float switch tandon, dan suhu/kelembaban udara (DHT11), lalu mengirim datanya ke broker MQTT setiap 10 detik, dan langsung saat pompa, mode, atau tandon berubah. Website menampilkan data secara realtime, menyimpan riwayatnya, dan bisa mengirim perintah pompa balik ke ESP32.
+ESP32 membaca kelembaban tanah, suhu tanah (DS18B20), float switch tandon, dan status alarm buzzer, lalu mengirim datanya ke broker MQTT setiap 10 detik, dan langsung saat pompa, mode, tandon, atau alarm berubah. Website menampilkan data secara realtime, menyimpan riwayatnya, dan bisa mengirim perintah pompa balik ke ESP32.
 
 - **Halaman publik** (`/`): data live, laporan, grafik, tabel, dan download CSV.
 - **Prediksi** (`/prediksi`): tren kelembaban tanah dan rekomendasi perawatan.
@@ -27,9 +27,23 @@ ESP32 ◄─subscribe── │  binus/garden/pump/cmd   ◄── Laravel (tomb
 | `php artisan mqtt:listen` | Subscribe ke topic sensor dan menyimpan setiap data ke tabel `sensor_data` |
 | Browser | Subscribe langsung ke broker lewat WebSocket, jadi tampilan live tanpa polling |
 | `POST /dashboard/pump` | Mengirim `auto` / `pump_on` / `pump_off` ke ESP32 (khusus user yang login) |
-| `GET /api/sensor…` | Hanya-baca: tabel riwayat, rentang grafik, dan preview CSV dari database |
+| Halaman dashboard & visitor | Tabel riwayat (filter, **pencarian**, halaman) dan rentang grafik dikirim server bersama halaman, tanpa API |
 
-> ESP32 **tidak** lagi mengirim data lewat HTTP API. Semua data masuk lewat MQTT.
+> Aplikasi ini **tidak punya HTTP API**. Data sensor masuk lewat MQTT, tampilan live lewat MQTT WebSocket, dan riwayat dibaca langsung dari database saat halaman dimuat.
+
+### Pencarian di tabel riwayat
+
+Kolom **Cari data** mencari di seluruh riwayat (bukan hanya halaman yang tampil) dan bisa digabung dengan filter tanggal/status:
+
+| Ketik | Hasil |
+|---|---|
+| `35` | Kelembaban tanah 35%, nilai raw 35, atau suhu tanah 35,0–35,9 °C |
+| `27.5` | Suhu tanah ±27,5 °C |
+| `2026-10-21`, `14:05` | Data pada tanggal / jam tersebut |
+| `kering`, `basah`, `aman`, `habis` | Kondisi tanah / tandon |
+| `menyiram`, `pompa on`, `pompa off` | Status pompa |
+| `otomatis`, `manual`, `manual on`, `manual off` | Mode pompa |
+| `alarm`, `buzzer` | Buzzer berbunyi |
 
 ---
 
@@ -88,6 +102,35 @@ Ganti password ini sebelum dipakai di production. Hanya **Admin** yang bisa meng
 
 ---
 
+## Menjalankan dengan Docker (Laravel + MySQL + InfluxDB)
+
+| Service | Image | Host | Dari dalam container `app` |
+|---|---|---|---|
+| `app` | `php:8.4-apache` ([Dockerfile](Dockerfile)) | http://localhost:8000 | — |
+| `mysql` | `mysql:8.0` | `127.0.0.1:3306` | `mysql:3306` |
+| `influxdb` | `influxdb:2.7` | http://localhost:8086 | `http://influxdb:8086` |
+
+Data MySQL dan InfluxDB disimpan di volume Docker (`mysql_data`, `influxdb_data`), jadi tidak hilang saat container dimatikan.
+
+> **Port 8000 dan 3306 harus kosong.** Matikan dulu `php artisan serve` dan MySQL XAMPP sebelum `docker compose up`.
+
+```bash
+docker compose up --build -d                          # build image + jalankan 3 service
+docker compose exec app composer install
+docker compose exec app php artisan key:generate      # hanya jika APP_KEY di .env masih kosong
+docker compose exec app php artisan migrate --seed
+docker compose exec app php artisan mqtt:listen       # simpan data ESP32 (biarkan terminal terbuka)
+```
+
+- Website: http://localhost:8000 · Cek koneksi InfluxDB: http://localhost:8000/test-influx (hanya di luar production)
+- InfluxDB UI: http://localhost:8086, login `admin` / `BinusIoT123!`, org `binus`, bucket `iot_sensors`
+- Konfigurasi InfluxDB ada di [config/influxdb.php](config/influxdb.php); kelasnya [app/Services/InfluxService.php](app/Services/InfluxService.php) (`writeSensorData`, `querySensorData`, `ping`).
+- `INFLUXDB_URL=http://influxdb:8086` di `.env` berlaku **di dalam Docker**. Dari host (script, Postman, browser) pakai `http://localhost:8086`.
+- User/org/bucket/token InfluxDB hanya dibuat saat volume masih kosong. Untuk mengulang dari nol: `docker compose down -v`.
+- Test di dalam container tetap memakai SQLite in-memory dari `phpunit.xml`: `docker compose exec app php artisan test --compact`.
+
+---
+
 ## Konfigurasi MQTT
 
 Semua nilai ada di [config/mqtt.php](config/mqtt.php) dan bisa diubah lewat `.env`:
@@ -112,7 +155,7 @@ File: [resources/esp32/iot_penyiram_binus/iot_penyiram_binus.ino](resources/esp3
 
 ### Library Arduino
 
-Install lewat **Library Manager**: `PubSubClient`, `ArduinoJson` (v7), `DHT sensor library`, `Adafruit SSD1306`, `Adafruit GFX`.
+Install lewat **Library Manager**: `PubSubClient`, `ArduinoJson` (v7), `DHT sensor library`, `OneWire`, `DallasTemperature`, `Adafruit SSD1306`, `Adafruit GFX`.
 
 ### Wiring
 
@@ -120,11 +163,12 @@ Install lewat **Library Manager**: `PubSubClient`, `ArduinoJson` (v7), `DHT sens
 |---|---|
 | Soil moisture (kapasitif) | D34 (ADC) |
 | Float switch tandon | D15 (`INPUT_PULLUP`, LOW = air habis) |
-| DHT11 | D4 |
+| DS18B20 (suhu tanah) | D26 (OneWire, **wajib** resistor pull-up 4,7 kΩ ke 3,3 V) |
+| DHT11 | D4 (tetap dikirim & disimpan di database, **tidak ditampilkan** di website) |
 | Relay pompa | D23 (aktif LOW) |
 | Lampu indikator 1 | D25 (menyala saat pompa ON) |
 | Lampu indikator 2 | D14 (menyala saat air habis) |
-| Buzzer | D13 (bunyi 3× tiap 5 detik saat air habis **dan** tanah kering) |
+| Buzzer pasif | D13 (bip-bip terus selama air habis **atau** tanah kering, langsung diam saat kondisi hilang) |
 | OLED SSD1306 | SDA 32, SCL 27, alamat `0x3C` |
 
 ### Yang perlu diatur sebelum upload
@@ -178,6 +222,8 @@ Dikirim ke `binus/garden/sensor/data` setiap 10 detik, **dan langsung** (maks. 1
   "tanaman": "bawang_merah",
   "soil_percent": 26,
   "soil_raw": 2633,
+  "soil_temperature": 27.81,
+  "soil_temperature_valid": true,
   "temperature": 28,
   "humidity": 34.4,
   "water_raw": 0,
@@ -186,14 +232,18 @@ Dikirim ke `binus/garden/sensor/data` setiap 10 detik, **dan langsung** (maks. 1
   "is_soil_dry": true,
   "pump_status": "OFF",
   "relay_d23": false,
-  "pump_command": "auto"
+  "pump_command": "auto",
+  "pump_command_local": "auto",
+  "buzzer_alarm": true
 }
 ```
 
 Cara Laravel membaca pesan ini ([SensorReadingIngestor](app/Services/SensorReadingIngestor.php)):
 
 - `relay_d23` dipakai sebagai status pompa yang sebenarnya.
-- Suhu dan kelembaban `0` dianggap DHT gagal baca dan disimpan kosong.
+- `soil_temperature_valid: false` berarti DS18B20 gagal dibaca; suhu tanah disimpan kosong.
+- `buzzer_alarm` disimpan apa adanya (kosong untuk firmware lama).
+- Suhu dan kelembaban udara (DHT11) tetap disimpan di database (`0` dianggap gagal baca), tetapi **tidak ditampilkan** di dashboard, visitor, maupun CSV.
 - Lampu D25 = pompa ON, lampu D14 = air habis.
 - Pesan yang bukan JSON atau nilainya di luar batas diabaikan (muncul sebagai peringatan di terminal `mqtt:listen`).
 

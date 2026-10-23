@@ -26,6 +26,7 @@ class FilterSensorDataRequest extends FormRequest
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'status' => ['nullable', 'in:ok,dry,empty'],
+            'q' => ['nullable', 'string', 'max:50'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
         ];
     }

@@ -8,7 +8,7 @@
             <div>
                 <p class="text-xs font-semibold tracking-widest text-brand-200 uppercase">Smart Irrigation · ESP32</p>
                 <h1 class="mt-1 text-2xl font-bold sm:text-3xl">IoT Penyiram Tanaman</h1>
-                <p class="mt-1 text-sm text-brand-100">Monitoring Soil, Water &amp; Udara (DHT) secara realtime</p>
+                <p class="mt-1 text-sm text-brand-100">Monitoring kelembaban &amp; suhu tanah, air tandon, pompa, dan buzzer secara realtime</p>
             </div>
 
             <div class="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium ring-1 ring-white/20 backdrop-blur">
@@ -156,30 +156,30 @@
         </x-ui.card>
     </div>
 
-    {{-- Row 2b: DHT air temperature + humidity --}}
-    <div id="dht" class="mb-4 grid scroll-mt-6 grid-cols-1 gap-4 md:grid-cols-2">
+    {{-- Row 2b: DS18B20 soil temperature + buzzer alarm --}}
+    <div id="suhu-tanah" class="mb-4 grid scroll-mt-6 grid-cols-1 gap-4 md:grid-cols-2">
         <x-ui.card>
             <div class="flex items-start justify-between gap-3">
                 <div class="flex items-center gap-3">
                     <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-500"><i class="fa-solid fa-temperature-half"></i></span>
                     <div>
-                        <p class="text-sm font-semibold text-slate-900">Suhu Udara</p>
-                        <p class="text-xs text-slate-400">Sensor DHT · Pin D4</p>
+                        <p class="text-sm font-semibold text-slate-900">Suhu Tanah</p>
+                        <p class="text-xs text-slate-400">Sensor DS18B20 · Pin D26</p>
                     </div>
                 </div>
-                <span id="temp-badge" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">--</span>
+                <span id="soil-temp-badge" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">--</span>
             </div>
 
             <div class="mt-5 flex items-end justify-between gap-4">
-                <p class="text-4xl font-bold text-slate-900"><span id="temp-value">--</span><span class="text-lg text-slate-400">°C</span></p>
+                <p class="text-4xl font-bold text-slate-900"><span id="soil-temp-value">--</span><span class="text-lg text-slate-400">°C</span></p>
                 <dl class="grid grid-cols-3 gap-4 text-right text-xs">
-                    <div><dt class="text-slate-400">Min</dt><dd class="text-base font-bold text-slate-900"><span id="temp-min">--</span>°</dd></div>
-                    <div><dt class="text-slate-400">Rata-rata</dt><dd class="text-base font-bold text-slate-900"><span id="temp-avg">--</span>°</dd></div>
-                    <div><dt class="text-slate-400">Maks</dt><dd class="text-base font-bold text-slate-900"><span id="temp-max">--</span>°</dd></div>
+                    <div><dt class="text-slate-400">Min</dt><dd class="text-base font-bold text-slate-900"><span id="soil-temp-min">--</span>°</dd></div>
+                    <div><dt class="text-slate-400">Rata-rata</dt><dd class="text-base font-bold text-slate-900"><span id="soil-temp-avg">--</span>°</dd></div>
+                    <div><dt class="text-slate-400">Maks</dt><dd class="text-base font-bold text-slate-900"><span id="soil-temp-max">--</span>°</dd></div>
                 </dl>
             </div>
             <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                <div id="temp-bar" class="h-full w-0 rounded-full bg-linear-to-r from-amber-300 to-orange-500 transition-all duration-700"></div>
+                <div id="soil-temp-bar" class="h-full w-0 rounded-full bg-linear-to-r from-amber-300 to-orange-500 transition-all duration-700"></div>
             </div>
             <p class="mt-1 flex justify-between text-[10px] text-slate-400"><span>0°C</span><span>50°C</span></p>
         </x-ui.card>
@@ -187,27 +187,26 @@
         <x-ui.card>
             <div class="flex items-start justify-between gap-3">
                 <div class="flex items-center gap-3">
-                    <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600"><i class="fa-solid fa-droplet"></i></span>
+                    <span id="buzzer-icon" class="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400 transition"><i class="fa-solid fa-bell"></i></span>
                     <div>
-                        <p class="text-sm font-semibold text-slate-900">Kelembaban Udara</p>
-                        <p class="text-xs text-slate-400">Sensor DHT · Pin D4</p>
+                        <p class="text-sm font-semibold text-slate-900">Alarm Buzzer</p>
+                        <p class="text-xs text-slate-400">Buzzer pasif · Pin D13</p>
                     </div>
                 </div>
-                <span id="hum-badge" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">--</span>
+                <span id="buzzer-badge" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">--</span>
             </div>
 
             <div class="mt-5 flex items-end justify-between gap-4">
-                <p class="text-4xl font-bold text-slate-900"><span id="hum-value">--</span><span class="text-lg text-slate-400">%</span></p>
-                <dl class="grid grid-cols-3 gap-4 text-right text-xs">
-                    <div><dt class="text-slate-400">Min</dt><dd class="text-base font-bold text-slate-900"><span id="hum-min">--</span>%</dd></div>
-                    <div><dt class="text-slate-400">Rata-rata</dt><dd class="text-base font-bold text-slate-900"><span id="hum-avg">--</span>%</dd></div>
-                    <div><dt class="text-slate-400">Maks</dt><dd class="text-base font-bold text-slate-900"><span id="hum-max">--</span>%</dd></div>
-                </dl>
+                <div>
+                    <p id="buzzer-state" class="text-4xl font-bold text-slate-400">--</p>
+                    <p id="buzzer-text" class="text-xs text-slate-400">Menunggu data</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-2xl font-bold text-amber-500"><span id="buzzer-ratio">--</span><span class="text-base text-slate-400">%</span></p>
+                    <p class="text-xs text-slate-400">alarm di data terakhir</p>
+                </div>
             </div>
-            <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                <div id="hum-bar" class="h-full w-0 rounded-full bg-cyan-500 transition-all duration-700"></div>
-            </div>
-            <p class="mt-1 flex justify-between text-[10px] text-slate-400"><span>0%</span><span>100%</span></p>
+            <p class="mt-4 text-xs text-slate-400">Berbunyi terus selama air tandon habis <span class="font-semibold">atau</span> tanah kering, dan langsung diam saat kondisinya hilang.</p>
         </x-ui.card>
     </div>
 
@@ -270,15 +269,15 @@
         </div>
     </x-ui.card>
 
-    {{-- DHT chart --}}
+    {{-- Soil temperature + buzzer chart --}}
     <x-ui.card class="mb-6">
         <div class="mb-5">
-            <h2 class="text-lg font-semibold text-slate-900">Grafik Suhu &amp; Kelembaban Udara</h2>
-            <p class="text-xs text-slate-400">Sensor DHT (D4), mengikuti rentang data grafik di atas. Celah pada garis = sensor DHT gagal dibaca.</p>
+            <h2 class="text-lg font-semibold text-slate-900">Grafik Suhu Tanah &amp; Alarm Buzzer</h2>
+            <p class="text-xs text-slate-400">DS18B20 (D26) dan buzzer (D13), mengikuti rentang data grafik di atas. Celah pada garis = DS18B20 gagal dibaca, area kuning = buzzer berbunyi.</p>
         </div>
 
         <div class="relative h-72">
-            <canvas id="dht-chart"></canvas>
+            <canvas id="soil-temp-chart"></canvas>
         </div>
     </x-ui.card>
 
@@ -362,7 +361,7 @@
     </x-ui.card>
 
     {{-- History table with date filter --}}
-    <x-ui.card padding="p-0" class="overflow-hidden">
+    <x-ui.card id="riwayat" padding="p-0" class="scroll-mt-6 overflow-hidden">
         <div class="border-b border-slate-200 px-6 py-4">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div>
@@ -377,22 +376,28 @@
                 </div>
             </div>
 
-            <form id="filter-form" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
+            <form id="filter-form" method="GET" action="{{ route('dashboard') }}#riwayat" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
+                <div class="col-span-full">
+                    <x-ui.label for="filter-search" value="Cari data" />
+                    <x-ui.input id="filter-search" type="search" name="q" icon="fa-magnifying-glass" maxlength="50" autocomplete="off"
+                        value="{{ $table['filters']['q'] }}" placeholder="Cari angka, tanggal, jam, status, atau mode pompa…" />
+                    <p class="mt-1 text-xs text-slate-400">Contoh: 35, 27.5, 2026-10-21, 14:05, kering, habis, menyiram, manual off, alarm</p>
+                </div>
                 <div>
                     <x-ui.label for="filter-date-from" value="Dari tanggal" />
-                    <x-ui.input id="filter-date-from" type="date" name="date_from" icon="fa-calendar" />
+                    <x-ui.input id="filter-date-from" type="date" name="date_from" icon="fa-calendar" value="{{ $table['filters']['date_from'] }}" />
                 </div>
                 <div>
                     <x-ui.label for="filter-date-to" value="Sampai tanggal" />
-                    <x-ui.input id="filter-date-to" type="date" name="date_to" icon="fa-calendar-check" />
+                    <x-ui.input id="filter-date-to" type="date" name="date_to" icon="fa-calendar-check" value="{{ $table['filters']['date_to'] }}" />
                 </div>
                 <div>
                     <x-ui.label for="filter-status" value="Status" />
                     <select id="filter-status" name="status" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none">
                         <option value="">Semua status</option>
-                        <option value="ok">Aman - Basah</option>
-                        <option value="dry">Tanah kering</option>
-                        <option value="empty">Air Habis</option>
+                        <option value="ok" @selected($table['filters']['status'] === 'ok')>Aman - Basah</option>
+                        <option value="dry" @selected($table['filters']['status'] === 'dry')>Tanah kering</option>
+                        <option value="empty" @selected($table['filters']['status'] === 'empty')>Air Habis</option>
                     </select>
                 </div>
                 <div class="flex items-end gap-2">
@@ -400,10 +405,12 @@
                         <i class="fa-solid fa-filter"></i>
                         Terapkan
                     </x-ui.button>
-                    <x-ui.button type="button" variant="secondary" id="filter-reset">Reset</x-ui.button>
+                    <a href="{{ route('dashboard') }}#riwayat" class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Reset</a>
                 </div>
             </form>
-            <p id="filter-error" class="mt-2 hidden text-sm text-red-600"></p>
+            @if ($table['error'])
+                <p class="mt-2 text-sm text-red-600">{{ $table['error'] }} Filter diabaikan.</p>
+            @endif
         </div>
 
         <div class="overflow-x-auto">
@@ -414,12 +421,12 @@
                         <th class="px-4 py-3 font-medium">Tanah %</th>
                         <th class="px-4 py-3 font-medium">Soil Raw</th>
                         <th class="px-4 py-3 font-medium">Air Tandon</th>
-                        <th class="px-4 py-3 font-medium">Suhu</th>
-                        <th class="px-4 py-3 font-medium">Udara %</th>
+                        <th class="px-4 py-3 font-medium">Suhu Tanah</th>
                         <th class="px-4 py-3 font-medium">Pompa</th>
                         <th class="px-4 py-3 font-medium">Mode</th>
                         <th class="px-4 py-3 font-medium">D25</th>
                         <th class="px-4 py-3 font-medium">D14</th>
+                        <th class="px-4 py-3 font-medium">Buzzer</th>
                         <th class="px-4 py-3 font-medium">Status</th>
                     </tr>
                 </thead>
@@ -431,11 +438,11 @@
         <div class="flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-4 text-sm">
             <p id="page-info" class="text-slate-500">-</p>
             <div class="flex gap-2">
-                <x-ui.button variant="secondary" id="page-prev" disabled>
+                <x-ui.button variant="secondary" id="page-prev" :disabled="! $table['links']['prev']">
                     <i class="fa-solid fa-chevron-left"></i>
                     Sebelumnya
                 </x-ui.button>
-                <x-ui.button variant="secondary" id="page-next" disabled>
+                <x-ui.button variant="secondary" id="page-next" :disabled="! $table['links']['next']">
                     Berikutnya
                     <i class="fa-solid fa-chevron-right"></i>
                 </x-ui.button>
@@ -448,12 +455,7 @@
         <x-sensor-stream />
         <script>
             (() => {
-                const HISTORY_URL = @json(url('/api/sensor/history'));
-                const RECORDS_URL = @json(url('/api/sensor'));
                 const CLOCK_TICK_MS = 5000;
-                // Give `php artisan mqtt:listen` a moment to store the reading before the table reloads.
-                const TABLE_REFRESH_DELAY_MS = 2000;
-                const REQUEST_TIMEOUT_MS = 5000;
                 const STALE_AFTER_MS = 60000;
                 const GAUGE_CIRCUMFERENCE = 326.73;
 
@@ -465,7 +467,7 @@
                     pumpSolid: '#10b981',
                     dry: '#f59e0b',
                     temperature: '#f97316',
-                    humidity: '#06b6d4',
+                    buzzer: 'rgba(245, 158, 11, 0.18)',
                 };
 
                 const PILL = 'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ';
@@ -484,22 +486,9 @@
                 // The float switch is on/off only, so the tank drawing shows "full enough" or "empty".
                 const waterLevel = (d) => (d.is_water_empty ? 8 : 75);
                 const formatDecimal = (value) => Number(value).toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-                const hasDht = (d) => d.temperature !== null && d.humidity !== null;
+                const hasSoilTemperature = (d) => d.soil_temperature !== null && d.soil_temperature !== undefined;
 
-                const TEMPERATURE_LEVELS = [
-                    { max: 20, label: 'Sejuk', badge: 'bg-brand-100 text-brand-700' },
-                    { max: 30, label: 'Normal', badge: 'bg-emerald-100 text-emerald-700' },
-                    { max: 35, label: 'Hangat', badge: 'bg-amber-100 text-amber-700' },
-                    { max: Infinity, label: 'Panas', badge: 'bg-red-100 text-red-700' },
-                ];
-
-                const HUMIDITY_LEVELS = [
-                    { max: 40, label: 'Udara Kering', badge: 'bg-amber-100 text-amber-700' },
-                    { max: 70, label: 'Ideal', badge: 'bg-emerald-100 text-emerald-700' },
-                    { max: Infinity, label: 'Udara Lembab', badge: 'bg-brand-100 text-brand-700' },
-                ];
-
-                const levelOf = (levels, value) => levels.find((level) => value <= level.max);
+                const { soilTemperatureLevel, buzzerReason } = window.SensorStream;
 
                 const formatAgo = (ms) => {
                     const seconds = Math.max(Math.round(ms / 1000), 0);
@@ -518,30 +507,6 @@
                     const date = new Date();
                     date.setDate(date.getDate() - days);
                     return toYmd(date);
-                };
-
-                const fetchJson = async (url) => {
-                    const controller = new AbortController();
-                    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-                    try {
-                        const response = await fetch(url, {
-                            headers: { Accept: 'application/json' },
-                            cache: 'no-store',
-                            signal: controller.signal,
-                        });
-                        const body = await response.json();
-
-                        if (!response.ok) {
-                            const error = new Error(body.message || 'Bad response');
-                            error.body = body;
-                            throw error;
-                        }
-
-                        return body;
-                    } finally {
-                        clearTimeout(timeout);
-                    }
                 };
 
                 /* ---------- Component cards ---------- */
@@ -586,7 +551,8 @@
                     renderLamp('lamp-d25', d.lampu1_d25, 'bg-amber-400 text-white shadow-lg shadow-amber-400/50');
                     renderLamp('lamp-d14', d.lampu2_d14, 'bg-red-500 text-white shadow-lg shadow-red-500/50');
 
-                    renderDht(d);
+                    renderSoilTemperature(d);
+                    renderBuzzer(d);
                 };
 
                 const renderPumpMode = (command) => {
@@ -597,26 +563,33 @@
                     confirmPumpCommand(command);
                 };
 
-                const renderDht = (d) => {
-                    if (!hasDht(d)) {
-                        setText('temp-badge', 'DHT Error');
-                        setClass('temp-badge', PILL + 'bg-red-100 text-red-700');
-                        setText('hum-badge', 'DHT Error');
-                        setClass('hum-badge', PILL + 'bg-red-100 text-red-700');
+                const renderSoilTemperature = (d) => {
+                    if (!hasSoilTemperature(d)) {
+                        setText('soil-temp-badge', 'DS18B20 Error');
+                        setClass('soil-temp-badge', PILL + 'bg-red-100 text-red-700');
                         return;
                     }
 
-                    const temperature = levelOf(TEMPERATURE_LEVELS, d.temperature);
-                    setText('temp-value', formatDecimal(d.temperature));
-                    setText('temp-badge', temperature.label);
-                    setClass('temp-badge', PILL + temperature.badge);
-                    $('temp-bar').style.width = clamp((d.temperature / 50) * 100, 0, 100) + '%';
+                    const level = soilTemperatureLevel(d.soil_temperature);
+                    setText('soil-temp-value', formatDecimal(d.soil_temperature));
+                    setText('soil-temp-badge', level.label);
+                    setClass('soil-temp-badge', PILL + level.badge);
+                    $('soil-temp-bar').style.width = clamp((d.soil_temperature / 50) * 100, 0, 100) + '%';
+                };
 
-                    const humidity = levelOf(HUMIDITY_LEVELS, d.humidity);
-                    setText('hum-value', Math.round(d.humidity));
-                    setText('hum-badge', humidity.label);
-                    setClass('hum-badge', PILL + humidity.badge);
-                    $('hum-bar').style.width = clamp(d.humidity, 0, 100) + '%';
+                const renderBuzzer = (d) => {
+                    if (d.buzzer_alarm === null || d.buzzer_alarm === undefined) {
+                        setText('buzzer-state', '--');
+                        setText('buzzer-text', 'Firmware belum mengirim status buzzer');
+                        return;
+                    }
+
+                    setText('buzzer-state', d.buzzer_alarm ? 'ALARM' : 'DIAM');
+                    setClass('buzzer-state', 'text-4xl font-bold ' + (d.buzzer_alarm ? 'text-amber-500' : 'text-slate-400'));
+                    setText('buzzer-text', d.buzzer_alarm ? 'Berbunyi: ' + (buzzerReason(d) ?? 'kondisi alarm') : 'Tidak ada kondisi alarm');
+                    setText('buzzer-badge', d.buzzer_alarm ? 'Berbunyi' : 'Diam');
+                    setClass('buzzer-badge', PILL + (d.buzzer_alarm ? 'bg-amber-100 text-amber-700' : OFF));
+                    setClass('buzzer-icon', 'flex h-11 w-11 items-center justify-center rounded-xl transition ' + (d.buzzer_alarm ? 'animate-pulse bg-amber-400 text-white' : 'bg-slate-100 text-slate-400'));
                 };
 
                 const renderStats = (rows) => {
@@ -629,17 +602,15 @@
                     setText('stat-avg', hasData ? Math.round(average(values)) : '--');
                     setText('pump-ratio', hasData ? Math.round((rows.filter((d) => d.pump_status).length / rows.length) * 100) : '--');
 
-                    const dhtRows = rows.filter(hasDht);
-                    const temperatures = dhtRows.map((d) => d.temperature);
-                    const humidities = dhtRows.map((d) => d.humidity);
-                    const hasDhtData = dhtRows.length > 0;
+                    const temperatures = rows.filter(hasSoilTemperature).map((d) => d.soil_temperature);
+                    const hasTemperatureData = temperatures.length > 0;
 
-                    setText('temp-min', hasDhtData ? formatDecimal(Math.min(...temperatures)) : '--');
-                    setText('temp-avg', hasDhtData ? formatDecimal(average(temperatures)) : '--');
-                    setText('temp-max', hasDhtData ? formatDecimal(Math.max(...temperatures)) : '--');
-                    setText('hum-min', hasDhtData ? Math.round(Math.min(...humidities)) : '--');
-                    setText('hum-avg', hasDhtData ? Math.round(average(humidities)) : '--');
-                    setText('hum-max', hasDhtData ? Math.round(Math.max(...humidities)) : '--');
+                    setText('soil-temp-min', hasTemperatureData ? formatDecimal(Math.min(...temperatures)) : '--');
+                    setText('soil-temp-avg', hasTemperatureData ? formatDecimal(average(temperatures)) : '--');
+                    setText('soil-temp-max', hasTemperatureData ? formatDecimal(Math.max(...temperatures)) : '--');
+
+                    const buzzerRows = rows.filter((d) => d.buzzer_alarm !== null && d.buzzer_alarm !== undefined);
+                    setText('buzzer-ratio', buzzerRows.length ? Math.round((buzzerRows.filter((d) => d.buzzer_alarm).length / buzzerRows.length) * 100) : '--');
                 };
 
                 const setLive = (state, label) => {
@@ -785,13 +756,13 @@
                     },
                 });
 
-                const dhtChart = new Chart($('dht-chart'), {
-                    type: 'line',
+                const soilTemperatureChart = new Chart($('soil-temp-chart'), {
                     data: {
                         labels: [],
                         datasets: [
                             {
-                                label: 'Suhu (°C)',
+                                type: 'line',
+                                label: 'Suhu tanah (°C)',
                                 data: [],
                                 borderColor: COLORS.temperature,
                                 backgroundColor: areaGradient(COLORS.temperature, '33'),
@@ -801,18 +772,18 @@
                                 pointRadius: 0,
                                 pointHoverRadius: 5,
                                 yAxisID: 'temperature',
+                                order: 1,
                             },
                             {
-                                label: 'Kelembaban udara (%)',
+                                type: 'bar',
+                                label: 'Alarm buzzer',
                                 data: [],
-                                borderColor: COLORS.humidity,
-                                backgroundColor: COLORS.humidity,
-                                borderWidth: 2,
-                                borderDash: [6, 4],
-                                tension: 0.4,
-                                pointRadius: 0,
-                                pointHoverRadius: 5,
-                                yAxisID: 'humidity',
+                                backgroundColor: COLORS.buzzer,
+                                borderWidth: 0,
+                                barPercentage: 1,
+                                categoryPercentage: 1,
+                                yAxisID: 'alarm',
+                                order: 2,
                             },
                         ],
                     },
@@ -835,14 +806,7 @@
                                 grid: { color: '#f1f5f9' },
                                 ticks: { color: COLORS.temperature, callback: (v) => v + '°C' },
                             },
-                            humidity: {
-                                position: 'right',
-                                min: 0,
-                                max: 100,
-                                border: { display: false },
-                                grid: { display: false },
-                                ticks: { color: COLORS.humidity, stepSize: 25, callback: (v) => v + '%' },
-                            },
+                            alarm: { display: false, min: 0, max: 1 },
                         },
                         plugins: {
                             legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, color: '#475569' } },
@@ -853,7 +817,13 @@
                                 usePointStyle: true,
                                 callbacks: {
                                     title: (items) => rows[items[0].dataIndex]?.created_at_label ?? '',
-                                    label: (item) => item.parsed.y === null ? item.dataset.label + ': --' : item.dataset.label + ': ' + formatDecimal(item.parsed.y),
+                                    label: (item) => {
+                                        if (item.datasetIndex === 1) {
+                                            const alarm = rows[item.dataIndex]?.buzzer_alarm;
+                                            return 'Buzzer: ' + (alarm === null || alarm === undefined ? '--' : alarm ? 'ALARM' : 'diam');
+                                        }
+                                        return item.parsed.y === null ? item.dataset.label + ': --' : item.dataset.label + ': ' + formatDecimal(item.parsed.y);
+                                    },
                                 },
                             },
                         },
@@ -895,16 +865,19 @@
                     chart.data.datasets[2].data = rows.map((d) => (d.pump_status ? 100 : null));
                     chart.update();
 
-                    dhtChart.data.labels = rows.map((d) => d.time_label);
-                    dhtChart.data.datasets[0].data = rows.map((d) => d.temperature);
-                    dhtChart.data.datasets[1].data = rows.map((d) => d.humidity);
-                    dhtChart.update();
+                    soilTemperatureChart.data.labels = rows.map((d) => d.time_label);
+                    soilTemperatureChart.data.datasets[0].data = rows.map((d) => d.soil_temperature ?? null);
+                    soilTemperatureChart.data.datasets[1].data = rows.map((d) => (d.buzzer_alarm ? 1 : null));
+                    soilTemperatureChart.update();
                 };
 
                 /* ---------- Live MQTT feed ---------- */
 
+                /** The newest readings (up to historyMax) are rendered with the page; the range buttons only slice them. */
+                const historyMax = @json($historyMax);
                 let historyLimit = @json($historyLimit);
-                let rows = @json($history);
+                let allRows = @json($history);
+                let rows = allRows.slice(-historyLimit);
 
                 const renderLive = () => {
                     if (rows.length) {
@@ -919,9 +892,10 @@
                  * Every message the ESP32 publishes arrives here straight from the broker.
                  */
                 const pushReading = (row) => {
-                    rows = [...rows, row].slice(-historyLimit);
+                    allRows = [...allRows, row].slice(-historyMax);
+                    rows = allRows.slice(-historyLimit);
                     renderLive();
-                    setTimeout(refreshTableIfLive, TABLE_REFRESH_DELAY_MS);
+                    prependLiveRow(row);
                 };
 
                 const onStreamStatus = (state) => {
@@ -929,25 +903,22 @@
                     renderDevice(rows);
                 };
 
-                const setRange = async (range) => {
+                const setRange = (range) => {
                     historyLimit = range;
                     document.querySelectorAll('#range-buttons button').forEach((button) => {
                         const isActive = Number(button.dataset.range) === range;
                         button.className = 'rounded-md px-3 py-1.5 transition ' + (isActive ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-900');
                     });
 
-                    try {
-                        rows = await fetchJson(HISTORY_URL + '?limit=' + range);
-                        renderLive();
-                    } catch (error) {
-                        setLive('error', 'Gagal memuat grafik, mencoba lagi…');
-                    }
+                    rows = allRows.slice(-range);
+                    renderLive();
                 };
 
                 /* ---------- History table with filters ---------- */
 
-                const filters = { date_from: '', date_to: '', status: '' };
-                let page = 1;
+                const table = @json($table);
+                const filters = table.filters;
+                let tableRows = table.data;
 
                 const cell = (text, classes = 'px-4 py-3 text-slate-600') => {
                     const td = document.createElement('td');
@@ -974,18 +945,18 @@
                     records.forEach((d) => {
                         const s = pumpState(d);
                         const tr = document.createElement('tr');
-                        tr.className = 'transition-colors duration-1000 hover:bg-slate-50' + (highlightIds.has(d.id) ? ' bg-brand-50' : '');
+                        tr.className = 'transition-colors duration-1000 hover:bg-slate-50' + (highlightIds.has(d) ? ' bg-brand-50' : '');
                         tr.append(
                             cell(d.created_at_label, 'whitespace-nowrap px-6 py-3 text-slate-600'),
                             cell(d.soil_percent + '%', 'px-4 py-3 font-semibold text-slate-900'),
                             cell(d.soil_raw),
                             cell(d.is_water_empty ? 'Habis' : 'Ada', 'px-4 py-3 font-medium ' + (d.is_water_empty ? 'text-red-600' : 'text-sky-700')),
-                            cell(d.temperature === null ? '--' : formatDecimal(d.temperature) + ' °C'),
-                            cell(d.humidity === null ? '--' : formatDecimal(d.humidity) + '%'),
+                            cell(hasSoilTemperature(d) ? formatDecimal(d.soil_temperature) + ' °C' : '--'),
                             onOffCell(d.pump_status),
                             cell(d.pump_command ? pumpModeLabel(d.pump_command) : '--', 'whitespace-nowrap px-4 py-3 text-slate-600'),
                             onOffCell(d.lampu1_d25),
                             onOffCell(d.lampu2_d14),
+                            d.buzzer_alarm === null || d.buzzer_alarm === undefined ? cell('--') : onOffCell(d.buzzer_alarm),
                         );
 
                         const statusCell = document.createElement('td');
@@ -1013,64 +984,50 @@
                     if (filters.status) {
                         parts.push(FILTER_LABELS[filters.status]);
                     }
+                    if (filters.q) {
+                        parts.push('cari "' + filters.q + '"');
+                    }
                     return parts.length ? 'Filter: ' + parts.join(' · ') : 'Semua data, terbaru di atas';
                 };
 
-                let tableTopId = 0;
+                const conditionOf = (d) => (d.is_water_empty ? 'empty' : d.is_soil_dry ? 'dry' : 'ok');
 
-                /**
-                 * @param {boolean} highlightNew  mark rows stored since the previous load (live refresh)
-                 */
-                const loadTable = async (highlightNew = false) => {
-                    const params = new URLSearchParams({ page, per_page: 15 });
-                    Object.entries(filters).forEach(([key, value]) => value && params.set(key, value));
-
-                    $('filter-error').classList.add('hidden');
-
-                    try {
-                        const result = await fetchJson(RECORDS_URL + '?' + params);
-                        const meta = result.meta;
-
-                        const previousTopId = tableTopId;
-                        tableTopId = Math.max(tableTopId, result.data[0]?.id ?? 0);
-                        renderTable(result.data, new Set(highlightNew ? result.data.filter((d) => d.id > previousTopId).map((d) => d.id) : []));
-                        setText('table-summary', describeFilters() + ' · ' + meta.total + ' data');
-                        setText('page-info', meta.total ? 'Menampilkan ' + meta.from + '–' + meta.to + ' dari ' + meta.total + ' · Hal. ' + meta.current_page + '/' + meta.last_page : 'Tidak ada data');
-                        $('page-prev').disabled = meta.current_page <= 1;
-                        $('page-next').disabled = meta.current_page >= meta.last_page;
-                    } catch (error) {
-                        const errors = error.body?.errors;
-                        setText('filter-error', errors ? Object.values(errors).flat()[0] : 'Gagal memuat riwayat data.');
-                        $('filter-error').classList.remove('hidden');
-                    }
+                const renderTableMeta = () => {
+                    const meta = table.meta;
+                    setText('table-summary', describeFilters() + ' · ' + meta.total.toLocaleString('id-ID') + ' data');
+                    setText('page-info', meta.total ? 'Menampilkan ' + meta.from + '–' + meta.to + ' dari ' + meta.total.toLocaleString('id-ID') + ' · Hal. ' + meta.current_page + '/' + meta.last_page : 'Tidak ada data');
                 };
 
                 /**
-                 * Only the first page of a filter that can still receive new readings follows the live feed.
+                 * A live MQTT reading joins the first page when it matches the active filter, so the
+                 * table follows the device without asking the server again.
                  */
-                const refreshTableIfLive = () => {
+                const prependLiveRow = (row) => {
                     const today = toYmd(new Date());
-                    if (page === 1 && (!filters.date_to || filters.date_to >= today)) {
-                        loadTable(true);
+                    const matchesFilter = !filters.q
+                        && (!filters.date_to || filters.date_to >= today)
+                        && (!filters.date_from || filters.date_from <= today)
+                        && (!filters.status || filters.status === conditionOf(row));
+
+                    if (table.meta.current_page !== 1 || !matchesFilter) {
+                        return;
                     }
+
+                    tableRows = [row, ...tableRows].slice(0, table.meta.per_page);
+                    table.meta.total += 1;
+                    table.meta.from = 1;
+                    table.meta.to = tableRows.length;
+                    renderTable(tableRows, new Set([row]));
+                    renderTableMeta();
                 };
 
-                const applyFilters = () => {
-                    filters.date_from = $('filter-date-from').value;
-                    filters.date_to = $('filter-date-to').value;
-                    filters.status = $('filter-status').value;
-                    page = 1;
-                    loadTable();
-                };
-
-                $('filter-form').addEventListener('submit', (event) => {
-                    event.preventDefault();
-                    applyFilters();
+                $('filter-form').addEventListener('submit', () => {
+                    // Empty fields would otherwise end up in the URL as ?date_from=&status=
+                    $('filter-form').querySelectorAll('input, select').forEach((field) => { field.disabled = !field.value; });
                 });
-
-                $('filter-reset').addEventListener('click', () => {
-                    $('filter-form').reset();
-                    applyFilters();
+                // Re-enable the fields when the page comes back from the browser's back/forward cache.
+                window.addEventListener('pageshow', () => {
+                    $('filter-form').querySelectorAll('input, select').forEach((field) => { field.disabled = false; });
                 });
 
                 document.querySelectorAll('#quick-dates button').forEach((button) => {
@@ -1083,47 +1040,24 @@
                             30: [daysAgo(29), daysAgo(0)],
                         };
                         [$('filter-date-from').value, $('filter-date-to').value] = ranges[quick];
-                        applyFilters();
+                        $('filter-form').requestSubmit();
                     });
                 });
 
-                $('page-prev').addEventListener('click', () => { page -= 1; loadTable(); });
-                $('page-next').addEventListener('click', () => { page += 1; loadTable(); });
+                $('page-prev').addEventListener('click', () => { if (table.links.prev) window.location = table.links.prev; });
+                $('page-next').addEventListener('click', () => { if (table.links.next) window.location = table.links.next; });
 
                 /* ---------- CSV export ---------- */
 
                 const exportForm = $('export-form');
                 const exportCheckboxes = () => [...exportForm.querySelectorAll('input[name="datasets[]"]')];
-                let exportCountTimer = null;
 
-                /**
-                 * Preview how many rows the download will contain, using the same filters as the CSV.
-                 */
                 const updateExportSummary = () => {
-                    clearTimeout(exportCountTimer);
-                    exportCountTimer = setTimeout(async () => {
-                        const selected = exportCheckboxes().filter((input) => input.checked).length;
-                        $('export-submit').disabled = selected === 0;
-
-                        if (selected === 0) {
-                            setText('export-summary', 'Pilih minimal satu jenis data sensor.');
-                            return;
-                        }
-
-                        const params = new URLSearchParams({ per_page: 5 });
-                        ['date_from', 'date_to', 'status'].forEach((key) => {
-                            const value = exportForm.elements[key].value;
-                            if (value) params.set(key, value);
-                        });
-
-                        try {
-                            const result = await fetchJson(RECORDS_URL + '?' + params);
-                            setText('export-summary', result.meta.total.toLocaleString('id-ID') + ' baris · ' + selected + ' jenis data sensor akan di-download.');
-                        } catch (error) {
-                            const errors = error.body?.errors;
-                            setText('export-summary', errors ? Object.values(errors).flat()[0] : 'Tidak dapat menghitung jumlah data.');
-                        }
-                    }, 300);
+                    const selected = exportCheckboxes().filter((input) => input.checked).length;
+                    $('export-submit').disabled = selected === 0;
+                    setText('export-summary', selected === 0
+                        ? 'Pilih minimal satu jenis data sensor.'
+                        : selected + ' jenis data sensor akan di-download. Kolom id & waktu selalu disertakan.');
                 };
 
                 exportForm.addEventListener('change', updateExportSummary);
@@ -1226,9 +1160,9 @@
                 });
 
                 renderLegend();
-                renderLive();
                 setRange(historyLimit);
-                loadTable();
+                renderTable(tableRows);
+                renderTableMeta();
                 window.SensorStream.connect({ onReading: pushReading, onStatus: onStreamStatus });
                 // Keeps "x dtk lalu" fresh and flips to Offline when the ESP32 stops publishing.
                 setInterval(() => renderDevice(rows), CLOCK_TICK_MS);

@@ -35,7 +35,9 @@ class SensorReadingIngestor
      * Map the firmware payload onto the sensor_data columns:
      * - relay_d23 is the real pump state ("pump_status" is sent as "ON"/"OFF"),
      * - lamp D25 lights while the pump runs and lamp D14 when the tank is empty,
-     * - a failed DHT read is sent as 0 °C / 0 % and stored as "no reading".
+     * - a failed DHT read is sent as 0 °C / 0 % and stored as "no reading" (DHT is stored but not shown),
+     * - a failed DS18B20 read is flagged by soil_temperature_valid = false and stored as "no reading",
+     * - buzzer_alarm (firmware v3) is kept as sent, or left empty for older firmware.
      *
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
@@ -45,6 +47,14 @@ class SensorReadingIngestor
         if ((float) ($payload['temperature'] ?? 0) === 0.0 && (float) ($payload['humidity'] ?? 0) === 0.0) {
             $payload['temperature'] = null;
             $payload['humidity'] = null;
+        }
+
+        if (($payload['soil_temperature_valid'] ?? true) === false) {
+            $payload['soil_temperature'] = null;
+        }
+
+        if (array_key_exists('buzzer_alarm', $payload)) {
+            $payload['buzzer_alarm'] = $this->toBoolean($payload['buzzer_alarm']);
         }
 
         $payload['pump_status'] = array_key_exists('relay_d23', $payload)
@@ -65,6 +75,7 @@ class SensorReadingIngestor
         return [
             'soil_percent' => ['required', 'integer', 'between:0,100'],
             'soil_raw' => ['required', 'integer', 'between:0,65535'],
+            'soil_temperature' => ['nullable', 'numeric', 'between:-55,125'],
             'water_raw' => ['nullable', 'integer', 'between:0,65535'],
             'temperature' => ['nullable', 'numeric', 'between:-40,80'],
             'humidity' => ['nullable', 'numeric', 'between:0,100'],
@@ -73,6 +84,7 @@ class SensorReadingIngestor
             'pump_status' => ['required', 'boolean'],
             'lampu1_d25' => ['required', 'boolean'],
             'lampu2_d14' => ['required', 'boolean'],
+            'buzzer_alarm' => ['nullable', 'boolean'],
             'pump_command' => ['nullable', 'string', 'max:20'],
         ];
     }

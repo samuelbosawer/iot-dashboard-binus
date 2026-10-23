@@ -15,8 +15,9 @@
          * Same mapping as App\Services\SensorReadingIngestor, so a live reading looks like a stored one.
          */
         const normalize = (payload, receivedAt = new Date()) => {
-            const hasDht = !(Number(payload.temperature) === 0 && Number(payload.humidity) === 0)
-                && payload.temperature !== null && payload.temperature !== undefined;
+            {{-- DHT11 air temperature / humidity are stored by the server but never shown. --}}
+            const hasSoilTemperature = payload.soil_temperature_valid !== false
+                && payload.soil_temperature !== null && payload.soil_temperature !== undefined;
             const pump = 'relay_d23' in payload ? toBoolean(payload.relay_d23) : toBoolean(payload.pump_status);
             const isWaterEmpty = toBoolean(payload.is_water_empty);
             const time = pad(receivedAt.getHours()) + ':' + pad(receivedAt.getMinutes()) + ':' + pad(receivedAt.getSeconds());
@@ -25,15 +26,15 @@
                 id: null,
                 soil_percent: Number(payload.soil_percent),
                 soil_raw: Number(payload.soil_raw),
+                soil_temperature: hasSoilTemperature ? Number(payload.soil_temperature) : null,
                 water_raw: payload.water_raw ?? null,
-                temperature: hasDht ? Number(payload.temperature) : null,
-                humidity: hasDht ? Number(payload.humidity) : null,
                 is_water_empty: isWaterEmpty,
                 is_soil_dry: toBoolean(payload.is_soil_dry),
                 pump_status: pump,
                 pump_command: payload.pump_command ?? null,
                 lampu1_d25: 'lampu1_d25' in payload ? toBoolean(payload.lampu1_d25) : pump,
                 lampu2_d14: 'lampu2_d14' in payload ? toBoolean(payload.lampu2_d14) : isWaterEmpty,
+                buzzer_alarm: 'buzzer_alarm' in payload ? toBoolean(payload.buzzer_alarm) : null,
                 created_at: receivedAt.toISOString(),
                 created_at_label: pad(receivedAt.getDate()) + ' ' + MONTHS[receivedAt.getMonth()] + ' ' + receivedAt.getFullYear() + ' ' + time,
                 time_label: time,
@@ -64,6 +65,21 @@
 
             return { key, ...PUMP_STATES[key] };
         };
+
+        /** Soil temperature bands for shallots (bawang merah). */
+        const SOIL_TEMPERATURE_LEVELS = [
+            { max: 20, label: 'Dingin', badge: 'bg-brand-100 text-brand-700' },
+            { max: 30, label: 'Ideal', badge: 'bg-emerald-100 text-emerald-700' },
+            { max: 35, label: 'Hangat', badge: 'bg-amber-100 text-amber-700' },
+            { max: Infinity, label: 'Panas', badge: 'bg-red-100 text-red-700' },
+        ];
+        const soilTemperatureLevel = (value) => SOIL_TEMPERATURE_LEVELS.find((level) => value <= level.max);
+
+        /** Why the firmware sounds the buzzer: tank empty OR soil dry. */
+        const buzzerReason = (d) => d.is_water_empty && d.is_soil_dry ? 'Air habis & tanah kering'
+            : d.is_water_empty ? 'Air tandon habis'
+            : d.is_soil_dry ? 'Tanah kering'
+            : null;
 
         const PUMP_MODES = { auto: 'Otomatis', pump_on: 'Manual ON', pump_off: 'Manual OFF' };
         const pumpModeLabel = (command) => PUMP_MODES[command] ?? command ?? '--';
@@ -106,6 +122,6 @@
             return client;
         };
 
-        return { connect, normalize, pumpState, pumpModeLabel };
+        return { connect, normalize, pumpState, pumpModeLabel, soilTemperatureLevel, buzzerReason };
     })();
 </script>

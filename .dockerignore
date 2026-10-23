@@ -1,0 +1,10 @@
+# Only docker/entrypoint.sh is copied into the image; the project is bind-mounted at runtime.
+.git
+node_modules
+vendor
+storage/logs
+storage/framework/cache
+storage/framework/sessions
+storage/framework/views
+database/*.sqlite
+.env

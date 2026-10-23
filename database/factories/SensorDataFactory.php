@@ -20,6 +20,7 @@ class SensorDataFactory extends Factory
         return [
             'soil_percent' => fake()->numberBetween(40, 90),
             'soil_raw' => fake()->numberBetween(1200, 2400),
+            'soil_temperature' => fake()->randomFloat(1, 24, 30),
             'water_raw' => null,
             'temperature' => fake()->randomFloat(1, 24, 34),
             'humidity' => fake()->randomFloat(1, 50, 90),
@@ -29,6 +30,7 @@ class SensorDataFactory extends Factory
             'pump_command' => 'auto',
             'lampu1_d25' => false,
             'lampu2_d14' => false,
+            'buzzer_alarm' => false,
         ];
     }
 
@@ -44,6 +46,16 @@ class SensorDataFactory extends Factory
     }
 
     /**
+     * Indicate that the DS18B20 soil temperature probe could not be read.
+     */
+    public function withoutSoilTemperature(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'soil_temperature' => null,
+        ]);
+    }
+
+    /**
      * Indicate that the soil is dry and the pump is watering.
      */
     public function soilDry(): static
@@ -54,6 +66,7 @@ class SensorDataFactory extends Factory
             'is_soil_dry' => true,
             'pump_status' => true,
             'lampu1_d25' => true,
+            'buzzer_alarm' => true,
         ]);
     }
 
@@ -66,6 +79,7 @@ class SensorDataFactory extends Factory
             'is_water_empty' => true,
             'pump_status' => false,
             'lampu2_d14' => true,
+            'buzzer_alarm' => true,
         ]);
     }
 }

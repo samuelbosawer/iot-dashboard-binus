@@ -1,11 +1,12 @@
 /*
- * Smart Garden Bawang Merah - MQTT v2
+ * Smart Garden Bawang Merah - MQTT v3
  * Board  : ESP32 (Arduino IDE)
- * Library: PubSubClient, ArduinoJson (v7), DHT sensor library, Adafruit SSD1306, Adafruit GFX
+ * Library: PubSubClient, ArduinoJson (v7), DHT sensor library, Adafruit SSD1306, Adafruit GFX,
+ *          OneWire, DallasTemperature   <-- BARU (untuk DS18B20)
  *
  * Komunikasi (tanpa HTTP API):
  *   Publish   binus/garden/sensor/data  -> JSON sensor tiap 10 detik
- *                                          + LANGSUNG saat pompa / mode / tandon berubah
+ *                                          + LANGSUNG saat pompa / mode / tandon / alarm berubah
  *                                          (disimpan Laravel lewat `php artisan mqtt:listen`,
  *                                           tampil live di dashboard lewat MQTT WebSocket)
  *   Subscribe binus/garden/pump/cmd     -> "auto" | "pump_on" | "pump_off" (tombol di dashboard)
@@ -17,23 +18,26 @@
  *
  * Kenapa publish saat berubah?
  *   Siram otomatis hanya 8 detik, sedangkan publish rutin tiap 10 detik. Tanpa publish saat
- *   berubah, pompa ON sering terjadi di antara dua publish sehingga tidak pernah tercatat di
- *   dashboard, dan tombol pompa di dashboard baru terkonfirmasi sampai 10 detik kemudian.
+ *   berubah, pompa ON sering terjadi di antara dua publish sehingga tidak tercatat di dashboard,
+ *   dan tombol pompa di dashboard baru terkonfirmasi sampai 10 detik kemudian.
  *
  * Pin:
  *   Soil Moisture Capacitive : D34 (ADC)
  *   Water Level Float Switch : D15 (INPUT_PULLUP, LOW = air habis)
- *   DHT11                    : D4
+ *   DHT11                    : D4   (tetap dikirim & disimpan, tidak ditampilkan di website)
+ *   DS18B20 (suhu tanah)     : 26 (OneWire, WAJIB resistor pull-up 4.7k ke 3.3V)   <-- BARU
  *   Pompa Air (relay)        : D23 (relay aktif LOW)
  *   Lampu Indikator 1        : D25 (pompa menyala)
  *   Lampu Indikator 2        : D14 (air tandon habis)
- *   Buzzer                   : D13
+ *   Buzzer (PASIF)           : D13 (dibunyikan dengan tone 2700 Hz)
  *   OLED SSD1306             : SDA 32, SCL 27, alamat 0x3C
  *
- * Buzzer:
- *   Bunyi 3x pendek, diulang tiap 5 detik, selama AIR TANDON HABIS DAN TANAH KERING
- *   (tanaman butuh air tapi pompa tidak bisa menyiram).
- *   Ubah ALARM_BUTUH_KEDUANYA ke false kalau mau bunyi saat salah satu kondisi saja.
+ * Buzzer (DIPERBAIKI):
+ *   Bunyi TERUS MENERUS selama AIR TANDON HABIS ATAU TANAH KERING.
+ *   Langsung berhenti begitu kondisinya hilang.
+ *   - BUZZER_NYALA_TERUS true  -> bunyi panjang tanpa jeda
+ *   - BUZZER_NYALA_TERUS false -> bunyi "bip-bip-bip" tanpa henti (default, lebih jelas terdengar)
+ *   - ALARM_BUTUH_KEDUANYA true -> hanya bunyi kalau air habis DAN tanah kering
  */
 
 #include <Wire.h>
@@ -43,6 +47,8 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <DHT.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 const char* ssid = "AKUT SB";
 const char* password = "samganteng#77";
@@ -60,16 +66,21 @@ const char* topic_subscribe = "binus/garden/pump/cmd";
 #define DHTPIN 4
 #define DHTTYPE DHT11
 
+// === DS18B20 SUHU TANAH ===
+#define ONE_WIRE_PIN 26
+const unsigned long INTERVAL_DS18B20 = 1000; // resolusi 12-bit butuh ~750 ms per konversi
+
 // === SAMA DENGAN PROJECT LAMA ===
 const int soilPin = 34, waterPin = 15, pumpPin = 23, lampu1 = 25, lampu2 = 14;
 
 // === BUZZER ===
 const int buzzerPin = 13;
-#define BUZZER_PASIF false        // true kalau buzzer pasif (butuh frekuensi / tone)
-#define BUZZER_AKTIF_HIGH true    // buzzer aktif: bunyi saat pin HIGH
-const int BUZZER_FREQ = 2000;     // hanya dipakai buzzer pasif
-const unsigned long BEEP_ON = 120, BEEP_OFF = 120, JEDA_ALARM_AIR = 5000;
-#define ALARM_BUTUH_KEDUANYA true // true = air habis DAN tanah kering, false = salah satu
+#define BUZZER_PASIF true          // buzzer pasif (hanya bunyi "klik" tanpa tone) -> true
+#define BUZZER_AKTIF_HIGH true     // buzzer aktif: bunyi saat pin HIGH
+#define BUZZER_NYALA_TERUS false   // true = bunyi panjang tanpa jeda, false = bip-bip tanpa henti
+#define ALARM_BUTUH_KEDUANYA false // false = air habis ATAU tanah kering (sesuai permintaan)
+const int BUZZER_FREQ = 2700;      // frekuensi nada buzzer pasif (coba 2500-4000 kalau kurang nyaring)
+const unsigned long BEEP_ON = 300, BEEP_OFF = 200;
 
 // === KALIBRASI SENSOR (SAMA DENGAN PROJECT LAMA) ===
 const int SOIL_DRY = 3050, SOIL_WET = 1450, BATAS_KERING = 35;
@@ -84,6 +95,8 @@ const unsigned long JEDA_PUBLISH_MIN = 1000;  // BARU: batas publish saat beruba
 
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 DHT dht(DHTPIN, DHTTYPE);
+OneWire oneWire(ONE_WIRE_PIN);
+DallasTemperature ds18b20(&oneWire);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -95,19 +108,27 @@ String pumpCommand = "auto";
 
 // BARU: state terakhir yang sudah dikirim, untuk mendeteksi perubahan
 bool perluPublish = true;
-bool lastPompaTerkirim = false, lastHabisTerkirim = false;
+bool lastPompaTerkirim = false, lastHabisTerkirim = false, lastAlarmTerkirim = false;
 String lastCommandTerkirim = "";
 
+// state DS18B20 (non-blocking)
+float suhuTanah = NAN;
+bool dsValid = false;
+bool dsAda = false;
+unsigned long lastDsRequest = 0;
+
 // state buzzer (non-blocking)
-int beepSisa = 0;
-bool beepNyala = false;
-unsigned long beepTimer = 0, lastAlarmAir = 0;
+bool alarmAktif = false;
+bool buzzerState = false;
+unsigned long beepTimer = 0;
 
 void setPump(bool nyala) {
   digitalWrite(pumpPin, RELAY_LOW ? (nyala ? LOW : HIGH) : (nyala ? HIGH : LOW));
 }
 
 void setBuzzer(bool nyala) {
+  if (nyala == buzzerState) return; // hindari tone() dipanggil berulang
+  buzzerState = nyala;
   if (BUZZER_PASIF) {
     if (nyala) tone(buzzerPin, BUZZER_FREQ); else noTone(buzzerPin);
   } else {
@@ -115,19 +136,46 @@ void setBuzzer(bool nyala) {
   }
 }
 
-// Antrikan n bunyi pendek (maks 6 supaya tidak menumpuk)
-void beep(int n) {
-  beepSisa = min(beepSisa + n, 6);
-}
-
-// Dipanggil tiap loop, menjalankan antrian bunyi tanpa delay
+// Dipanggil tiap loop: bunyi terus selama alarmAktif, langsung diam saat alarm hilang
 void updateBuzzer() {
   unsigned long now = millis();
-  if (beepNyala) {
-    if (now - beepTimer >= BEEP_ON) { setBuzzer(false); beepNyala = false; beepTimer = now; }
-  } else if (beepSisa > 0 && now - beepTimer >= BEEP_OFF) {
-    setBuzzer(true); beepNyala = true; beepTimer = now; beepSisa--;
+
+  if (!alarmAktif) {
+    setBuzzer(false);
+    return;
   }
+
+  if (BUZZER_NYALA_TERUS) {
+    setBuzzer(true);
+    return;
+  }
+
+  // Pola bip-bip tanpa henti
+  if (buzzerState) {
+    if (now - beepTimer >= BEEP_ON) { setBuzzer(false); beepTimer = now; }
+  } else {
+    if (now - beepTimer >= BEEP_OFF) { setBuzzer(true); beepTimer = now; }
+  }
+}
+
+// Baca hasil konversi sebelumnya lalu minta konversi baru (tanpa menunggu 750 ms)
+void updateDS18B20() {
+  unsigned long now = millis();
+  if (now - lastDsRequest < INTERVAL_DS18B20) return;
+
+  if (lastDsRequest != 0) {
+    float t = ds18b20.getTempCByIndex(0);
+    // -127 = sensor tidak terbaca, 85 = nilai reset (konversi belum selesai / kabel bermasalah)
+    if (t == DEVICE_DISCONNECTED_C || t == 85.0f || t < -55.0f || t > 125.0f) {
+      dsValid = false;
+    } else {
+      suhuTanah = t;
+      dsValid = true;
+    }
+  }
+
+  ds18b20.requestTemperatures(); // kembali langsung karena setWaitForConversion(false)
+  lastDsRequest = now;
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
@@ -190,7 +238,7 @@ void setup() {
   delay(1000);
   Serial.println("\n\n");
   Serial.println("==========================================");
-  Serial.println("  SMART GARDEN BAWANG MERAH - MQTT v2");
+  Serial.println("  SMART GARDEN BAWANG MERAH - MQTT v3");
   Serial.println("==========================================");
 
   pinMode(pumpPin, OUTPUT);
@@ -198,7 +246,11 @@ void setup() {
   pinMode(lampu2, OUTPUT);
   pinMode(waterPin, INPUT_PULLUP);
   pinMode(buzzerPin, OUTPUT);
+  buzzerState = true;   // paksa setBuzzer(false) benar-benar menulis pin
   setBuzzer(false);
+
+  // Tes buzzer saat start: bunyi 2x (memastikan buzzer berfungsi)
+  for (int i = 0; i < 2; i++) { setBuzzer(true); delay(200); setBuzzer(false); delay(200); }
 
   setPump(false);
   digitalWrite(lampu1, LOW);
@@ -207,6 +259,14 @@ void setup() {
   Wire.begin(SDA_PIN, SCL_PIN);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   dht.begin();
+
+  // === DS18B20 ===
+  ds18b20.begin();
+  ds18b20.setResolution(12);
+  ds18b20.setWaitForConversion(false); // non-blocking
+  dsAda = ds18b20.getDeviceCount() > 0;
+  Serial.printf("[DS18B20] Sensor terdeteksi: %d di GPIO%d\n", ds18b20.getDeviceCount(), ONE_WIRE_PIN);
+  if (!dsAda) Serial.println("[DS18B20] ✗ Tidak terdeteksi, cek kabel & resistor pull-up 4.7k");
 
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
@@ -233,7 +293,7 @@ void setup() {
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(mqttCallback);
   client.setKeepAlive(60);
-  // Default buffer PubSubClient hanya 256 byte, JSON sensor ~300 byte -> publish gagal diam-diam.
+  // Default buffer PubSubClient hanya 256 byte, JSON sensor ~400 byte -> publish gagal diam-diam.
   client.setBufferSize(1024);
 
   // SAMA DENGAN PROJECT LAMA: boleh langsung siram saat start bila tanah kering
@@ -247,6 +307,7 @@ void loop() {
   reconnect();
   client.loop();
   updateBuzzer();
+  updateDS18B20();
 
   // Siklus sensor tiap 500 ms (pengganti delay(500) project lama, non-blocking)
   if (millis() - lastSensor < INTERVAL_SENSOR) return;
@@ -293,28 +354,28 @@ void loop() {
   digitalWrite(lampu1, pompaOn ? HIGH : LOW);
   digitalWrite(lampu2, habis ? HIGH : LOW);
 
-  // ===== BUZZER =====
+  // ===== BUZZER (bunyi terus selama kondisi alarm) =====
   bool kering = persen < BATAS_KERING;
-  bool alarm = ALARM_BUTUH_KEDUANYA ? (habis && kering) : (habis || kering);
-  if (alarm && now - lastAlarmAir >= JEDA_ALARM_AIR) {
-    lastAlarmAir = now;
-    beep(3);
-  }
+  alarmAktif = ALARM_BUTUH_KEDUANYA ? (habis && kering) : (habis || kering);
 
   // ===== OLED =====
   display.clearDisplay(); display.setCursor(0,0); display.setTextColor(1);
   display.printf("MQTT:%s %ddBm\n", client.connected() ? "ON" : "OFF", WiFi.RSSI());
   display.printf("Soil %d%% %s\n", persen, pumpCommand.c_str());
+  if (dsValid) display.printf("T.Tanah %.1f C\n", suhuTanah);
+  else display.println("T.Tanah Error");
   if (valid) display.printf("T%.1f H%.0f\n", temp, hum);
   else display.println("DHT Error");
   display.printf("%s %s\n", habis ? "HABIS" : "OK", stat.c_str());
+  if (alarmAktif) display.println(habis && kering ? "!! AIR & TANAH !!" : (habis ? "!! AIR HABIS !!" : "!! TANAH KERING !!"));
   display.display();
 
   // ===== PUBLISH MQTT =====
-  // BARU: kirim langsung bila pompa / mode / tandon berubah, selain publish rutin tiap 10 detik
+  // BARU: kirim langsung bila pompa / mode / tandon / alarm berubah, selain publish rutin tiap 10 detik
   bool berubah = perluPublish
     || pompaOn != lastPompaTerkirim
     || habis != lastHabisTerkirim
+    || alarmAktif != lastAlarmTerkirim
     || pumpCommand != lastCommandTerkirim;
   bool waktunyaRutin = millis() - lastSend > INTERVAL_PUBLISH;
   bool bolehKirimCepat = millis() - lastSend >= JEDA_PUBLISH_MIN;
@@ -324,22 +385,25 @@ void loop() {
     if (!client.connected()) return;
     lastSend = millis();
 
-    // DATA MASTER - FIELD SAMA DENGAN PROJECT LAMA
+    // DATA MASTER - FIELD SAMA DENGAN PROJECT LAMA + DS18B20
     JsonDocument master;
     master["device_id"] = "ESP32-BAMER-01";
     master["tanaman"] = "bawang_merah";
     master["soil_percent"] = persen;
     master["soil_raw"] = raw;
+    master["soil_temperature"] = dsValid ? suhuTanah : 0;   // BARU: suhu tanah DS18B20 (°C)
+    master["soil_temperature_valid"] = dsValid;             // BARU
     master["temperature"] = valid ? temp : 0;
     master["humidity"] = valid ? hum : 0;
     master["water_raw"] = wRaw;
     master["water_level_status"] = habis ? "EMPTY" : "OK";
     master["is_water_empty"] = habis;
-    master["is_soil_dry"] = persen < BATAS_KERING;
+    master["is_soil_dry"] = kering;
     master["pump_status"] = pompaOn ? "ON" : "OFF";
     master["relay_d23"] = pompaOn;
     master["pump_command"] = pumpCommand;
     master["pump_command_local"] = pumpCommand;
+    master["buzzer_alarm"] = alarmAktif;                    // BARU
 
     String payload;
     serializeJson(master, payload);
@@ -349,6 +413,7 @@ void loop() {
       perluPublish = false;
       lastPompaTerkirim = pompaOn;
       lastHabisTerkirim = habis;
+      lastAlarmTerkirim = alarmAktif;
       lastCommandTerkirim = pumpCommand;
     }
 
@@ -357,10 +422,13 @@ void loop() {
     Serial.printf("| WAKTU: %lu detik | WiFi: %d dBm | MQTT: %s\n", millis()/1000, WiFi.RSSI(), client.connected() ? "OK" : "PUTUS");
     Serial.printf("| Publish: %s (%d byte)%s\n", terkirim ? "TERKIRIM" : "GAGAL", payload.length(), waktunyaRutin ? "" : " [perubahan]");
     Serial.println("--------------------------------------------------");
-    Serial.printf("| Tanah : %3d%% (raw %4d) | %s\n", persen, raw, persen < BATAS_KERING ? "KERING" : "LEMBAB");
+    Serial.printf("| Tanah : %3d%% (raw %4d) | %s\n", persen, raw, kering ? "KERING" : "LEMBAB");
+    if (dsValid) Serial.printf("| Suhu Tanah (DS18B20): %.2f C\n", suhuTanah);
+    else Serial.println("| Suhu Tanah (DS18B20): ERROR");
     if (valid) Serial.printf("| Udara : Suhu %.1f C | Hum %.0f%%\n", temp, hum);
     else Serial.println("| Udara : DHT ERROR");
     Serial.printf("| Air   : %s (pin %d) | Pompa : %s (%s)\n", habis ? "HABIS" : "OK", wRaw, pompaOn ? "NYALA" : "MATI", stat.c_str());
+    Serial.printf("| Buzzer: %s\n", alarmAktif ? "ALARM" : "DIAM");
     Serial.printf("| Perintah: %s\n", pumpCommand.c_str());
     Serial.println("--------------------------------------------------");
     Serial.println(payload);

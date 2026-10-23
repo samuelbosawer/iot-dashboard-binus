@@ -5,7 +5,7 @@
 ])
 
 @php
-    $description ??= 'Pantau kondisi tanaman secara realtime: kelembaban tanah, air tandon (float switch), suhu & kelembaban udara, serta penyiraman otomatis berbasis ESP32.';
+    $description ??= 'Pantau kondisi tanaman secara realtime: kelembaban & suhu tanah, air tandon (float switch), alarm buzzer, serta penyiraman otomatis berbasis ESP32.';
     $siteName = 'Taman Pintar IoT';
     $fullTitle = $title.' · '.$siteName;
     $canonical = url()->current();
@@ -28,7 +28,7 @@
 <meta name="format-detection" content="telephone=no">
 
 @unless ($noindex)
-    <meta name="keywords" content="IoT, smart irrigation, penyiram tanaman otomatis, ESP32, sensor kelembaban tanah, float switch, DHT11, monitoring tanaman">
+    <meta name="keywords" content="IoT, smart irrigation, penyiram tanaman otomatis, ESP32, sensor kelembaban tanah, float switch, DS18B20, suhu tanah, monitoring tanaman">
 
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="{{ $siteName }}">

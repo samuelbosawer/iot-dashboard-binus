@@ -46,17 +46,27 @@ class MqttListen extends Command
         }
 
         $topic = config('mqtt.topics.sensor');
+        $broker = config('mqtt.host').':'.config('mqtt.port').(config('mqtt.tls') ? ' (TLS)' : '');
+
+        // An old `php artisan config:cache` made before config/mqtt.php existed leaves these empty.
+        if (blank(config('mqtt.host')) || blank($topic)) {
+            $this->error('Konfigurasi MQTT kosong. Jalankan `php artisan config:clear` (atau config:cache ulang) lalu coba lagi.');
+
+            return self::FAILURE;
+        }
+
+        $this->line('Menghubungkan ke '.$broker.' …');
 
         while (! $this->shouldStop) {
             try {
                 $this->client = $clients->connect('listener');
-                $this->info('Terhubung ke '.config('mqtt.host').', subscribe '.$topic);
+                $this->info('Terhubung ke '.$broker.', subscribe '.$topic);
 
                 $this->client->subscribe($topic, fn (string $topic, string $message) => $this->store($ingestor, $message));
                 $this->client->loop(true);
                 $this->client->disconnect();
             } catch (MqttClientException $exception) {
-                $this->error('MQTT terputus: '.$exception->getMessage().'. Mencoba lagi dalam '.self::RECONNECT_DELAY_SECONDS.' detik…');
+                $this->error('MQTT ke '.$broker.' gagal: '.$exception->getMessage().'. Mencoba lagi dalam '.self::RECONNECT_DELAY_SECONDS.' detik…');
                 sleep(self::RECONNECT_DELAY_SECONDS);
             }
         }

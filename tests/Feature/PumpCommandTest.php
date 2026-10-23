@@ -63,5 +63,5 @@ test('the dashboard shows the pump controls and connects to the mqtt websocket',
         ->assertSee('data-pump-command="pump_on"', false)
         ->assertSee('mqtt.min.js')
         ->assertSee('wss:\/\/broker.hivemq.com:8884\/mqtt', false)
-        ->assertDontSee('/api/sensor/history?limit=');
+        ->assertDontSee('/api/sensor');
 });

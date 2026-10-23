@@ -54,12 +54,12 @@ test('the prediction chart uses real hourly data and projects the soil trend', f
     $response->assertSee('Tanah segera mengering')->assertSee('prediction-chart');
 });
 
-test('recommendations warn when the tank is empty and dht data is missing', function () {
-    SensorData::factory()->waterEmpty()->withoutDht()->create();
+test('recommendations warn when the tank is empty and the soil temperature probe is missing', function () {
+    SensorData::factory()->waterEmpty()->withoutSoilTemperature()->create();
 
     $titles = collect($this->get(route('prediction'))->viewData('recommendations'))->pluck('title');
 
-    expect($titles)->toContain('Isi tandon sekarang', 'Data suhu belum masuk', 'Lanjutkan pengumpulan data')
+    expect($titles)->toContain('Isi tandon sekarang', 'Data suhu tanah belum masuk', 'Lanjutkan pengumpulan data')
         ->not->toContain('Kondisi stabil');
 });
 

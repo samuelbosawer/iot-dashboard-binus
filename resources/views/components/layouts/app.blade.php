@@ -28,9 +28,9 @@
                             Dashboard
                         </a>
 
-                        <a href="{{ route('dashboard') }}#dht" class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-slate-600 transition hover:bg-slate-100">
+                        <a href="{{ route('dashboard') }}#suhu-tanah" class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-slate-600 transition hover:bg-slate-100">
                             <i class="fa-solid fa-temperature-half"></i>
-                            Sensor DHT
+                            Suhu Tanah
                         </a>
 
                         <a href="{{ route('dashboard.prediction') }}" @class([

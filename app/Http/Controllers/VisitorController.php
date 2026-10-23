@@ -6,6 +6,7 @@ use App\Enums\SensorDataset;
 use App\Http\Requests\VisitorReportRequest;
 use App\Http\Resources\SensorDataResource;
 use App\Models\SensorData;
+use App\Services\SensorHistoryTable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 
@@ -13,10 +14,12 @@ class VisitorController extends Controller
 {
     private const RECENT_LIMIT = 30;
 
+    private const TABLE_PER_PAGE = 10;
+
     /**
      * Display the public visitor page with a general report of the chosen period.
      */
-    public function index(VisitorReportRequest $request): View
+    public function index(VisitorReportRequest $request, SensorHistoryTable $table): View
     {
         $days = $request->days();
         $from = now()->subDays($days - 1)->startOfDay();
@@ -40,13 +43,14 @@ class VisitorController extends Controller
             'latest' => $recent->isNotEmpty() ? SensorDataResource::make($recent->last())->resolve() : null,
             'recent' => SensorDataResource::collection($recent)->resolve(),
             'datasets' => SensorDataset::cases(),
+            'table' => $table->forRequest($request, self::TABLE_PER_PAGE, 'tabel'),
         ]);
     }
 
     /**
      * Aggregate every reading since the given moment into one general report.
      *
-     * @return array{total: int, avg_soil: ?float, avg_temperature: ?float, min_temperature: ?float, max_temperature: ?float, avg_humidity: ?float, min_humidity: ?float, max_humidity: ?float, pump_percent: int, ok_percent: int, dry_percent: int, empty_percent: int, ok: int, dry: int, empty: int}
+     * @return array{total: int, avg_soil: ?float, avg_soil_temperature: ?float, min_soil_temperature: ?float, max_soil_temperature: ?float, pump_percent: int, buzzer_percent: int, ok_percent: int, dry_percent: int, empty_percent: int, ok: int, dry: int, empty: int}
      */
     private function summary(Carbon $from): array
     {
@@ -54,9 +58,9 @@ class VisitorController extends Controller
             ->where('created_at', '>=', $from)
             ->selectRaw('COUNT(*) as total')
             ->selectRaw('AVG(soil_percent) as avg_soil')
-            ->selectRaw('AVG(temperature) as avg_temperature, MIN(temperature) as min_temperature, MAX(temperature) as max_temperature')
-            ->selectRaw('AVG(humidity) as avg_humidity, MIN(humidity) as min_humidity, MAX(humidity) as max_humidity')
+            ->selectRaw('AVG(soil_temperature) as avg_soil_temperature, MIN(soil_temperature) as min_soil_temperature, MAX(soil_temperature) as max_soil_temperature')
             ->selectRaw('SUM(CASE WHEN pump_status = 1 THEN 1 ELSE 0 END) as pump_on')
+            ->selectRaw('SUM(CASE WHEN buzzer_alarm = 1 THEN 1 ELSE 0 END) as buzzer_on')
             ->selectRaw('SUM(CASE WHEN is_water_empty = 1 THEN 1 ELSE 0 END) as empty_count')
             ->selectRaw('SUM(CASE WHEN is_water_empty = 0 AND is_soil_dry = 1 THEN 1 ELSE 0 END) as dry_count')
             ->toBase()
@@ -72,13 +76,11 @@ class VisitorController extends Controller
         return [
             'total' => $total,
             'avg_soil' => $round($row->avg_soil),
-            'avg_temperature' => $round($row->avg_temperature),
-            'min_temperature' => $round($row->min_temperature),
-            'max_temperature' => $round($row->max_temperature),
-            'avg_humidity' => $round($row->avg_humidity),
-            'min_humidity' => $round($row->min_humidity),
-            'max_humidity' => $round($row->max_humidity),
+            'avg_soil_temperature' => $round($row->avg_soil_temperature),
+            'min_soil_temperature' => $round($row->min_soil_temperature),
+            'max_soil_temperature' => $round($row->max_soil_temperature),
             'pump_percent' => $percent((int) $row->pump_on),
+            'buzzer_percent' => $percent((int) $row->buzzer_on),
             'ok_percent' => $percent($ok),
             'dry_percent' => $percent($dry),
             'empty_percent' => $percent($empty),
@@ -91,7 +93,7 @@ class VisitorController extends Controller
     /**
      * Plain-language findings of the report, so visitors do not have to read the numbers themselves.
      *
-     * @param  array{total: int, avg_soil: ?float, avg_temperature: ?float, min_temperature: ?float, max_temperature: ?float, avg_humidity: ?float, pump_percent: int, ok_percent: int, dry_percent: int, empty_percent: int}  $summary
+     * @param  array{total: int, avg_soil: ?float, avg_soil_temperature: ?float, min_soil_temperature: ?float, max_soil_temperature: ?float, pump_percent: int, buzzer_percent: int, ok_percent: int, dry_percent: int, empty_percent: int}  $summary
      * @return list<array{icon: string, tone: string, text: string}>
      */
     private function conclusions(array $summary): array
@@ -110,24 +112,21 @@ class VisitorController extends Controller
             default => ['icon' => 'fa-seedling', 'tone' => 'brand', 'text' => "Tanah terjaga lembab dengan rata-rata {$number($soil)}%."],
         };
 
-        if ($summary['avg_temperature'] !== null) {
-            $temperature = $summary['avg_temperature'];
-            $range = "{$number($summary['min_temperature'])}–{$number($summary['max_temperature'])} °C";
+        if ($summary['avg_soil_temperature'] !== null) {
+            $temperature = $summary['avg_soil_temperature'];
+            $range = "{$number($summary['min_soil_temperature'])}–{$number($summary['max_soil_temperature'])} °C";
             $conclusions[] = match (true) {
-                $temperature < 20 => ['icon' => 'fa-temperature-low', 'tone' => 'brand', 'text' => "Udara sejuk, suhu rata-rata {$number($temperature)} °C (rentang {$range})."],
-                $temperature <= 30 => ['icon' => 'fa-temperature-half', 'tone' => 'emerald', 'text' => "Suhu udara normal, rata-rata {$number($temperature)} °C (rentang {$range})."],
-                $temperature <= 35 => ['icon' => 'fa-temperature-three-quarters', 'tone' => 'amber', 'text' => "Udara cukup hangat, rata-rata {$number($temperature)} °C (rentang {$range})."],
-                default => ['icon' => 'fa-temperature-full', 'tone' => 'red', 'text' => "Udara panas, rata-rata {$number($temperature)} °C (rentang {$range}). Tanaman butuh penyiraman lebih sering."],
-            };
-
-            $humidity = $summary['avg_humidity'];
-            $conclusions[] = match (true) {
-                $humidity < 40 => ['icon' => 'fa-droplet-slash', 'tone' => 'amber', 'text' => "Udara kering, kelembaban rata-rata {$number($humidity)}%."],
-                $humidity <= 70 => ['icon' => 'fa-droplet', 'tone' => 'emerald', 'text' => "Kelembaban udara ideal, rata-rata {$number($humidity)}%."],
-                default => ['icon' => 'fa-cloud-rain', 'tone' => 'brand', 'text' => "Udara lembab, kelembaban rata-rata {$number($humidity)}%."],
+                $temperature < 20 => ['icon' => 'fa-temperature-low', 'tone' => 'brand', 'text' => "Suhu tanah dingin, rata-rata {$number($temperature)} °C (rentang {$range}). Pertumbuhan umbi bisa melambat."],
+                $temperature <= 30 => ['icon' => 'fa-temperature-half', 'tone' => 'emerald', 'text' => "Suhu tanah ideal, rata-rata {$number($temperature)} °C (rentang {$range})."],
+                $temperature <= 35 => ['icon' => 'fa-temperature-three-quarters', 'tone' => 'amber', 'text' => "Suhu tanah cukup hangat, rata-rata {$number($temperature)} °C (rentang {$range}). Air tanah lebih cepat menguap."],
+                default => ['icon' => 'fa-temperature-full', 'tone' => 'red', 'text' => "Suhu tanah panas, rata-rata {$number($temperature)} °C (rentang {$range}). Pertimbangkan mulsa atau naungan."],
             };
         } else {
-            $conclusions[] = ['icon' => 'fa-temperature-half', 'tone' => 'slate', 'text' => 'Sensor DHT belum mengirim data suhu dan kelembaban udara pada periode ini.'];
+            $conclusions[] = ['icon' => 'fa-temperature-half', 'tone' => 'slate', 'text' => 'Sensor suhu tanah (DS18B20) belum mengirim data pada periode ini.'];
+        }
+
+        if ($summary['buzzer_percent'] > 0) {
+            $conclusions[] = ['icon' => 'fa-bell', 'tone' => 'amber', 'text' => "Alarm buzzer berbunyi pada {$summary['buzzer_percent']}% pembacaan (air habis atau tanah kering)."];
         }
 
         $conclusions[] = ['icon' => 'fa-faucet-drip', 'tone' => 'emerald', 'text' => "Pompa menyiram pada {$summary['pump_percent']}% dari seluruh pembacaan."];
@@ -142,14 +141,14 @@ class VisitorController extends Controller
     /**
      * Daily averages for every day of the period, including days without readings.
      *
-     * @return list<array{date: string, label: string, total: int, avg_soil: ?float, avg_temperature: ?float, avg_humidity: ?float}>
+     * @return list<array{date: string, label: string, total: int, avg_soil: ?float, avg_soil_temperature: ?float}>
      */
     private function daily(Carbon $from, int $days): array
     {
         $rows = SensorData::query()
             ->where('created_at', '>=', $from)
             ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
-            ->selectRaw('AVG(soil_percent) as avg_soil, AVG(temperature) as avg_temperature, AVG(humidity) as avg_humidity')
+            ->selectRaw('AVG(soil_percent) as avg_soil, AVG(soil_temperature) as avg_soil_temperature')
             ->groupByRaw('DATE(created_at)')
             ->toBase()
             ->get()
@@ -165,8 +164,7 @@ class VisitorController extends Controller
                     'label' => $date->format('d M'),
                     'total' => (int) ($row->total ?? 0),
                     'avg_soil' => isset($row->avg_soil) ? round((float) $row->avg_soil, 1) : null,
-                    'avg_temperature' => isset($row->avg_temperature) ? round((float) $row->avg_temperature, 1) : null,
-                    'avg_humidity' => isset($row->avg_humidity) ? round((float) $row->avg_humidity, 1) : null,
+                    'avg_soil_temperature' => isset($row->avg_soil_temperature) ? round((float) $row->avg_soil_temperature, 1) : null,
                 ];
             })
             ->all();

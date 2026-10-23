@@ -88,19 +88,25 @@ test('dashboard shows the dataset download form', function () {
         ->assertSee('Pin D34');
 });
 
-test('csv can include dht air temperature and humidity', function () {
-    SensorData::factory()->create(['temperature' => 28.5, 'humidity' => 65]);
-    SensorData::factory()->withoutDht()->create();
+test('csv can include soil temperature and buzzer alarm', function () {
+    SensorData::factory()->create(['soil_temperature' => 28.5, 'buzzer_alarm' => true]);
+    SensorData::factory()->withoutSoilTemperature()->create(['buzzer_alarm' => null]);
 
     $response = $this->actingAs(User::factory()->create())
-        ->get(route('sensor.export', ['datasets' => ['climate']]))
+        ->get(route('sensor.export', ['datasets' => ['soil_temperature', 'buzzer']]))
         ->assertOk();
 
     $rows = csvRows($response->streamedContent());
 
-    expect($rows[0])->toBe(['id', 'waktu', 'suhu_c', 'kelembaban_udara'])
-        ->and(array_slice($rows[1], 2))->toBe(['28.5', '65'])
+    expect($rows[0])->toBe(['id', 'waktu', 'suhu_tanah_c', 'alarm_buzzer'])
+        ->and(array_slice($rows[1], 2))->toBe(['28.5', '1'])
         ->and(array_slice($rows[2], 2))->toBe(['', '']);
+});
+
+test('dht air temperature and humidity can no longer be exported', function () {
+    $this->actingAs(User::factory()->create())
+        ->get(route('sensor.export', ['datasets' => ['climate']]))
+        ->assertSessionHasErrorsIn('export', 'datasets.0');
 });
 
 test('the status column reports what the pump really did, not just a dry soil', function (array $attributes, string $expected) {

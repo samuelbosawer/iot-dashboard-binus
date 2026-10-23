@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InfluxTestController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\PumpCommandController;
 use App\Http\Controllers\SensorExportController;
@@ -19,6 +20,11 @@ Route::get('sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 Route::get('visitor/export', SensorExportController::class)
     ->middleware('throttle:10,1')
     ->name('visitor.export');
+
+// Connection check for the Docker InfluxDB; never exposed in production.
+if (! app()->isProduction()) {
+    Route::get('test-influx', InfluxTestController::class)->name('test-influx');
+}
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');

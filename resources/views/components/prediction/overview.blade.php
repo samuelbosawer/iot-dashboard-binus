@@ -17,7 +17,7 @@
     $number = fn (float $value): string => number_format($value, 1, ',', '.');
 
     $steps = [
-        ['icon' => 'fa-satellite-dish', 'title' => 'Kumpulkan data', 'text' => 'ESP32 mengirim data soil, float switch, DHT, dan pompa secara rutin.'],
+        ['icon' => 'fa-satellite-dish', 'title' => 'Kumpulkan data', 'text' => 'ESP32 mengirim data kelembaban & suhu tanah, float switch, pompa, dan buzzer secara rutin.'],
         ['icon' => 'fa-file-csv', 'title' => 'Siapkan dataset', 'text' => 'Download CSV dari menu Download untuk dibersihkan dan dilabeli.'],
         ['icon' => 'fa-brain', 'title' => 'Latih model', 'text' => 'Latih & evaluasi model (mis. Python scikit-learn) memakai dataset tersebut.'],
         ['icon' => 'fa-plug', 'title' => 'Integrasi prediksi', 'text' => 'Hasil model ditampilkan di halaman ini secara realtime.'],

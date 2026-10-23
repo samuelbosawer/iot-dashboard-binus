@@ -1,0 +1,68 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: iot-dashboard-binus-app
+    container_name: iot-app
+    ports:
+      - "8000:80"
+    volumes:
+      - .:/var/www/html
+    # Database and InfluxDB settings come from .env (DB_HOST=mysql, INFLUXDB_URL=http://influxdb:8086).
+    # They are deliberately not set here: container environment variables override phpunit.xml,
+    # which would point `php artisan test` (RefreshDatabase) at the real MySQL database.
+    depends_on:
+      mysql:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: iot-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: iot_dashboard
+      MYSQL_USER: iot_user
+      MYSQL_PASSWORD: iot123
+      MYSQL_ROOT_PASSWORD: root123
+      TZ: Asia/Jakarta
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uiot_user", "-piot123"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: iot-influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      # Runs only on the very first start (empty volume): creates user, org, bucket and token.
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: BinusIoT123!
+      DOCKER_INFLUXDB_INIT_ORG: binus
+      DOCKER_INFLUXDB_INIT_BUCKET: iot_sensors
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: binus-iot-super-secret-token-12345
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  influxdb_data:
+  influxdb_config:

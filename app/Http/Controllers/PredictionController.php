@@ -76,16 +76,16 @@ class PredictionController extends Controller
         $row = SensorData::query()
             ->selectRaw('COUNT(*) as total, MIN(created_at) as first_at, MAX(created_at) as last_at')
             ->selectRaw('COUNT(DISTINCT DATE(created_at)) as days')
-            ->selectRaw('SUM(CASE WHEN is_soil_dry = 1 THEN 1 ELSE 0 END) as dry')
-            ->selectRaw('SUM(CASE WHEN is_water_empty = 1 THEN 1 ELSE 0 END) as empty')
+            ->selectRaw('SUM(CASE WHEN is_soil_dry = 1 THEN 1 ELSE 0 END) as dry_count')
+            ->selectRaw('SUM(CASE WHEN is_water_empty = 1 THEN 1 ELSE 0 END) as empty_count')
             ->toBase()
             ->first();
 
         return [
             'total' => (int) $row->total,
             'days' => (int) $row->days,
-            'dry' => (int) $row->dry,
-            'empty' => (int) $row->empty,
+            'dry' => (int) $row->dry_count,
+            'empty' => (int) $row->empty_count,
             'first_at' => $row->first_at,
             'last_at' => $row->last_at,
         ];
@@ -214,7 +214,7 @@ class PredictionController extends Controller
                 'icon' => 'fa-seedling',
                 'tone' => 'brand',
                 'target' => 'Memperkirakan kelembaban tanah (%) 1 jam ke depan, sehingga penyiraman bisa dijadwalkan sebelum tanah kering.',
-                'features' => ['Riwayat kelembaban tanah', 'Suhu & kelembaban udara (DHT)', 'Status pompa', 'Jam dalam sehari'],
+                'features' => ['Riwayat kelembaban tanah', 'Suhu tanah (DS18B20)', 'Status pompa', 'Jam dalam sehari'],
                 'algorithm' => 'Regresi (Linear Regression / Random Forest)',
                 'requirements' => [$readings, $days],
             ],
@@ -224,7 +224,7 @@ class PredictionController extends Controller
                 'icon' => 'fa-water',
                 'tone' => 'sky',
                 'target' => 'Memperkirakan kapan float switch akan mendeteksi air tandon habis, sehingga tandon bisa diisi lebih awal.',
-                'features' => ['Durasi pompa menyala sejak tandon terisi', 'Frekuensi penyiraman', 'Suhu udara', 'Riwayat status float switch'],
+                'features' => ['Durasi pompa menyala sejak tandon terisi', 'Frekuensi penyiraman', 'Suhu tanah', 'Riwayat status float switch'],
                 'algorithm' => 'Klasifikasi (Logistic Regression / Decision Tree)',
                 'requirements' => [
                     $readings,
@@ -257,7 +257,7 @@ class PredictionController extends Controller
         $latest = SensorData::query()->latest('id')->first();
         $day = SensorData::query()
             ->where('created_at', '>=', now()->subDay())
-            ->selectRaw('COUNT(*) as total, AVG(temperature) as avg_temperature, COUNT(temperature) as dht_count')
+            ->selectRaw('COUNT(*) as total, AVG(soil_temperature) as avg_soil_temperature, COUNT(soil_temperature) as soil_temperature_count')
             ->selectRaw('SUM(CASE WHEN pump_status = 1 THEN 1 ELSE 0 END) as pump_count')
             ->toBase()
             ->first();
@@ -306,10 +306,10 @@ class PredictionController extends Controller
             $items[] = ['icon' => 'fa-gauge-high', 'tone' => 'amber', 'title' => 'Pompa terlalu sering menyala', 'text' => "Pompa aktif pada {$pumpShare}% data 24 jam terakhir. Cek kebocoran, posisi sensor tanah, atau kalibrasi nilai kering/basah sensor."];
         }
 
-        if ((int) $day->total > 0 && (int) $day->dht_count === 0) {
-            $items[] = ['icon' => 'fa-temperature-half', 'tone' => 'slate', 'title' => 'Data suhu belum masuk', 'text' => 'Server belum menerima suhu & kelembaban udara 24 jam terakhir. Tambahkan nilai DHT pada data yang dikirim ESP32 agar prediksi lebih akurat.'];
-        } elseif ($day->avg_temperature !== null && (float) $day->avg_temperature > 32) {
-            $items[] = ['icon' => 'fa-sun', 'tone' => 'amber', 'title' => 'Suhu udara tinggi', 'text' => 'Rata-rata suhu 24 jam terakhir '.$number((float) $day->avg_temperature).' °C. Tanah lebih cepat kering; penyiraman pagi atau sore lebih efektif.'];
+        if ((int) $day->total > 0 && (int) $day->soil_temperature_count === 0) {
+            $items[] = ['icon' => 'fa-temperature-half', 'tone' => 'slate', 'title' => 'Data suhu tanah belum masuk', 'text' => 'Sensor DS18B20 tidak terbaca 24 jam terakhir. Periksa kabel di pin D26 dan resistor pull-up 4,7 kΩ.'];
+        } elseif ($day->avg_soil_temperature !== null && (float) $day->avg_soil_temperature > 32) {
+            $items[] = ['icon' => 'fa-sun', 'tone' => 'amber', 'title' => 'Suhu tanah tinggi', 'text' => 'Rata-rata suhu tanah 24 jam terakhir '.$number((float) $day->avg_soil_temperature).' °C. Tanah lebih cepat kering; mulsa dan penyiraman pagi atau sore lebih efektif.'];
         }
 
         $pending = collect($models)->reject(fn (array $model): bool => $model['ready']);

@@ -6,15 +6,17 @@ use App\Models\SensorData;
 
 /**
  * The groups of columns a user can pick when downloading the sensor dataset as CSV.
+ * DHT11 air temperature / humidity are still stored but intentionally not offered here.
  */
 enum SensorDataset: string
 {
     case Soil = 'soil';
     case Water = 'water';
-    case Climate = 'climate';
+    case SoilTemperature = 'soil_temperature';
     case Pump = 'pump';
     case LampD25 = 'lamp_d25';
     case LampD14 = 'lamp_d14';
+    case Buzzer = 'buzzer';
     case Status = 'status';
 
     /**
@@ -25,10 +27,11 @@ enum SensorDataset: string
         return match ($this) {
             self::Soil => 'Kelembaban Tanah',
             self::Water => 'Float Switch Air Tandon',
-            self::Climate => 'Suhu & Kelembaban Udara (DHT)',
+            self::SoilTemperature => 'Suhu Tanah',
             self::Pump => 'Pompa Air',
             self::LampD25 => 'Lampu Indikator 1',
             self::LampD14 => 'Lampu Indikator 2',
+            self::Buzzer => 'Alarm Buzzer',
             self::Status => 'Status Sistem',
         };
     }
@@ -41,10 +44,11 @@ enum SensorDataset: string
         return match ($this) {
             self::Soil => 'D34',
             self::Water => 'D15',
-            self::Climate => 'D4',
+            self::SoilTemperature => 'D26',
             self::Pump => 'D23',
             self::LampD25 => 'D25',
             self::LampD14 => 'D14',
+            self::Buzzer => 'D13',
             self::Status => null,
         };
     }
@@ -54,10 +58,11 @@ enum SensorDataset: string
         return match ($this) {
             self::Soil => 'soil_percent, soil_raw, tanah_kering',
             self::Water => 'status_air, air_habis',
-            self::Climate => 'suhu_c, kelembaban_udara',
+            self::SoilTemperature => 'suhu_tanah_c',
             self::Pump => 'pompa_d23, mode_pompa',
             self::LampD25 => 'lampu_d25',
             self::LampD14 => 'lampu_d14',
+            self::Buzzer => 'alarm_buzzer',
             self::Status => 'status',
         };
     }
@@ -79,9 +84,8 @@ enum SensorDataset: string
                 'status_air' => fn (SensorData $reading): string => $reading->is_water_empty ? 'Habis' : 'Ada',
                 'air_habis' => fn (SensorData $reading): int => (int) $reading->is_water_empty,
             ],
-            self::Climate => [
-                'suhu_c' => fn (SensorData $reading): ?float => $reading->temperature,
-                'kelembaban_udara' => fn (SensorData $reading): ?float => $reading->humidity,
+            self::SoilTemperature => [
+                'suhu_tanah_c' => fn (SensorData $reading): ?float => $reading->soil_temperature,
             ],
             self::Pump => [
                 'pompa_d23' => fn (SensorData $reading): int => (int) $reading->pump_status,
@@ -92,6 +96,9 @@ enum SensorDataset: string
             ],
             self::LampD14 => [
                 'lampu_d14' => fn (SensorData $reading): int => (int) $reading->lampu2_d14,
+            ],
+            self::Buzzer => [
+                'alarm_buzzer' => fn (SensorData $reading): ?int => $reading->buzzer_alarm === null ? null : (int) $reading->buzzer_alarm,
             ],
             self::Status => [
                 'status' => fn (SensorData $reading): string => $reading->statusLabel(),

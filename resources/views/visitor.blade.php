@@ -12,7 +12,7 @@
     $periodLabels = [1 => 'Hari ini', 7 => '7 hari', 30 => '30 hari'];
 @endphp
 
-<x-layouts.guest title="Monitoring Tanaman Realtime" description="Pantau kelembaban tanah, air tandon, suhu & kelembaban udara, serta aktivitas penyiraman otomatis secara realtime. Lihat laporan, tabel data, grafik, dan download dataset CSV.">
+<x-layouts.guest title="Monitoring Tanaman Realtime" description="Pantau kelembaban & suhu tanah, air tandon, alarm buzzer, serta aktivitas penyiraman otomatis secara realtime. Lihat laporan, tabel data, grafik, dan download dataset CSV.">
     {{-- Top navigation --}}
     <x-visitor.navbar />
 
@@ -43,7 +43,7 @@
                     Taman Pintar <span class="bg-linear-to-r from-emerald-300 via-brand-200 to-emerald-300 bg-[length:200%_100%] bg-clip-text text-transparent motion-safe-only animate-shimmer">IoT</span>
                 </h1>
                 <p class="mt-4 max-w-xl text-sm text-brand-100 sm:text-lg">
-                    Pantau kondisi tanaman secara langsung: kelembaban tanah, level air tandon, suhu &amp; kelembaban udara, serta aktivitas penyiraman otomatis oleh ESP32.
+                    Pantau kondisi tanaman secara langsung: kelembaban &amp; suhu tanah, level air tandon, alarm buzzer, serta aktivitas penyiraman otomatis oleh ESP32.
                 </p>
 
                 <div class="mt-8 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
@@ -122,37 +122,32 @@
                     <p id="v-water-label" class="mt-3 text-center text-[11px] font-semibold text-slate-500 sm:text-xs">--</p>
                 </x-ui.card>
 
-                {{-- Air temperature --}}
+                {{-- Soil temperature (DS18B20) --}}
                 <x-ui.card padding="p-4 sm:p-6" class="reveal transition hover:-translate-y-1 hover:shadow-lg [transition-delay:160ms]">
                     <div class="flex items-start justify-between gap-2">
-                        <p class="text-xs font-semibold text-slate-700 sm:text-sm">Suhu Udara</p>
+                        <p class="text-xs font-semibold text-slate-700 sm:text-sm">Suhu Tanah</p>
                         <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-9 sm:w-9 bg-orange-50 text-orange-500"><i class="fa-solid fa-temperature-half"></i></span>
                     </div>
                     <div class="mt-4 flex h-24 items-end justify-center gap-3 sm:h-32 sm:gap-5">
                         <div class="relative flex h-full w-5 items-end sm:w-6 overflow-hidden rounded-full bg-slate-100">
-                            <div id="v-temp-bar" class="w-full rounded-full bg-linear-to-t from-orange-500 to-amber-300 transition-all duration-1000" style="height: 0%"></div>
+                            <div id="v-soil-temp-bar" class="w-full rounded-full bg-linear-to-t from-orange-500 to-amber-300 transition-all duration-1000" style="height: 0%"></div>
                         </div>
-                        <p class="pb-1 text-2xl font-bold text-slate-900 sm:pb-2 sm:text-4xl"><span id="v-temp">--</span><span class="text-base text-slate-400">°C</span></p>
+                        <p class="pb-1 text-2xl font-bold text-slate-900 sm:pb-2 sm:text-4xl"><span id="v-soil-temp">--</span><span class="text-base text-slate-400">°C</span></p>
                     </div>
-                    <p id="v-temp-label" class="mt-3 text-center text-[11px] font-semibold text-slate-500 sm:text-xs">Sensor DHT</p>
+                    <p id="v-soil-temp-label" class="mt-3 text-center text-[11px] font-semibold text-slate-500 sm:text-xs">Sensor DS18B20</p>
                 </x-ui.card>
 
-                {{-- Air humidity --}}
+                {{-- Buzzer alarm --}}
                 <x-ui.card padding="p-4 sm:p-6" class="reveal transition hover:-translate-y-1 hover:shadow-lg [transition-delay:240ms]">
                     <div class="flex items-start justify-between gap-2">
-                        <p class="text-xs font-semibold text-slate-700 sm:text-sm">Kelembaban Udara</p>
-                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-9 sm:w-9 bg-cyan-50 text-cyan-600"><i class="fa-solid fa-droplet"></i></span>
+                        <p class="text-xs font-semibold text-slate-700 sm:text-sm">Alarm Buzzer</p>
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-9 sm:w-9 bg-amber-50 text-amber-500"><i class="fa-solid fa-bell"></i></span>
                     </div>
-                    <div class="mt-4 flex h-24 items-center justify-center sm:h-32">
-                        <div class="relative h-20 w-20 sm:h-28 sm:w-28">
-                            <span class="absolute inset-0 flex items-center justify-center"><i class="fa-solid fa-droplet text-[5rem] text-slate-100 sm:text-[7rem]"></i></span>
-                            <div id="v-hum-clip" class="absolute inset-0 flex items-center justify-center transition-all duration-1000" style="clip-path: inset(100% 0 0 0)">
-                                <i class="fa-solid fa-droplet text-[5rem] text-cyan-400 sm:text-[7rem]"></i>
-                            </div>
-                            <p class="absolute inset-0 flex items-center justify-center pt-4 text-lg font-bold text-slate-900 sm:pt-6 sm:text-2xl"><span id="v-hum">--</span><span class="text-sm">%</span></p>
-                        </div>
+                    <div class="mt-4 flex h-24 flex-col items-center justify-center gap-2 sm:h-32">
+                        <span id="v-buzzer-icon" class="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-2xl text-slate-300 transition sm:h-20 sm:w-20 sm:text-4xl"><i class="fa-solid fa-bell"></i></span>
+                        <p id="v-buzzer" class="text-base font-bold text-slate-400 sm:text-xl">--</p>
                     </div>
-                    <p id="v-hum-label" class="mt-3 text-center text-[11px] font-semibold text-slate-500 sm:text-xs">Sensor DHT</p>
+                    <p id="v-buzzer-label" class="mt-3 text-center text-[11px] font-semibold text-slate-500 sm:text-xs">Air habis / tanah kering</p>
                 </x-ui.card>
             </div>
 
@@ -193,8 +188,8 @@
                 @foreach ([
                     ['label' => 'Total data', 'value' => $summary['total'], 'decimals' => 0, 'unit' => '', 'icon' => 'fa-database', 'tone' => 'slate', 'hint' => 'pembacaan sensor'],
                     ['label' => 'Rata-rata tanah', 'value' => $summary['avg_soil'], 'decimals' => 1, 'unit' => '%', 'icon' => 'fa-seedling', 'tone' => 'brand', 'hint' => 'kelembaban tanah'],
-                    ['label' => 'Rata-rata suhu', 'value' => $summary['avg_temperature'], 'decimals' => 1, 'unit' => '°C', 'icon' => 'fa-temperature-half', 'tone' => 'amber', 'hint' => $format($summary['min_temperature']).' – '.$format($summary['max_temperature']).' °C'],
-                    ['label' => 'Rata-rata udara', 'value' => $summary['avg_humidity'], 'decimals' => 1, 'unit' => '%', 'icon' => 'fa-droplet', 'tone' => 'brand', 'hint' => $format($summary['min_humidity']).' – '.$format($summary['max_humidity']).' %'],
+                    ['label' => 'Rata-rata suhu tanah', 'value' => $summary['avg_soil_temperature'], 'decimals' => 1, 'unit' => '°C', 'icon' => 'fa-temperature-half', 'tone' => 'amber', 'hint' => $format($summary['min_soil_temperature']).' – '.$format($summary['max_soil_temperature']).' °C'],
+                    ['label' => 'Alarm buzzer', 'value' => $summary['buzzer_percent'], 'decimals' => 0, 'unit' => '%', 'icon' => 'fa-bell', 'tone' => 'red', 'hint' => 'air habis / tanah kering'],
                     ['label' => 'Pompa aktif', 'value' => $summary['pump_percent'], 'decimals' => 0, 'unit' => '%', 'icon' => 'fa-faucet-drip', 'tone' => 'emerald', 'hint' => 'dari seluruh data'],
                 ] as $index => $tile)
                     <x-ui.card padding="p-4 sm:p-6" class="reveal first:col-span-2 lg:first:col-span-1" style="transition-delay: {{ $index * 70 }}ms">
@@ -261,14 +256,14 @@
             <div class="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
                 <x-ui.card padding="p-4 sm:p-6" class="reveal">
                     <h3 class="text-base font-semibold text-slate-900">Rata-rata Harian · {{ $periodLabels[$days] }}</h3>
-                    <p class="text-xs text-slate-400">Batang = kelembaban tanah (%), garis = suhu (°C) &amp; kelembaban udara (%)</p>
+                    <p class="text-xs text-slate-400">Batang = kelembaban tanah (%), garis = suhu tanah (°C)</p>
                     <div class="relative mt-4 h-60 sm:h-72">
                         <canvas id="v-daily-chart"></canvas>
                     </div>
                 </x-ui.card>
 
                 <x-ui.card padding="p-4 sm:p-6" class="reveal [transition-delay:120ms]">
-                    <h3 class="text-base font-semibold text-slate-900">Suhu &amp; Kelembaban Udara Live</h3>
+                    <h3 class="text-base font-semibold text-slate-900">Kelembaban &amp; Suhu Tanah Live</h3>
                     <p class="text-xs text-slate-400">{{ count($recent) }} pembacaan terakhir, diperbarui otomatis</p>
                     <div class="relative mt-4 h-60 sm:h-72">
                         <canvas id="v-live-chart"></canvas>
@@ -294,22 +289,29 @@
             </div>
 
             <x-ui.card padding="p-0" class="reveal overflow-hidden">
-                <form id="v-table-form" class="grid grid-cols-2 gap-3 border-b border-slate-200 px-4 py-4 sm:px-6 lg:grid-cols-[1fr_1fr_1fr_auto]">
+                <form id="v-table-form" method="GET" action="{{ route('visitor') }}#tabel" class="grid grid-cols-2 gap-3 border-b border-slate-200 px-4 py-4 sm:px-6 lg:grid-cols-[1fr_1fr_1fr_auto]">
+                    <input type="hidden" name="days" value="{{ $days }}">
+                    <div class="col-span-full">
+                        <x-ui.label for="v-table-search" value="Cari data" />
+                        <x-ui.input id="v-table-search" type="search" name="q" icon="fa-magnifying-glass" maxlength="50" autocomplete="off"
+                            value="{{ $table['filters']['q'] }}" placeholder="Cari angka, tanggal, jam, atau status…" />
+                        <p class="mt-1 text-xs text-slate-400">Contoh: 35, 27.5, 2026-10-21, 14:05, kering, habis, menyiram, manual off, alarm</p>
+                    </div>
                     <div>
                         <x-ui.label for="v-table-from" value="Dari tanggal" />
-                        <x-ui.input id="v-table-from" type="date" name="date_from" icon="fa-calendar" />
+                        <x-ui.input id="v-table-from" type="date" name="date_from" icon="fa-calendar" value="{{ $table['filters']['date_from'] }}" />
                     </div>
                     <div>
                         <x-ui.label for="v-table-to" value="Sampai tanggal" />
-                        <x-ui.input id="v-table-to" type="date" name="date_to" icon="fa-calendar-check" />
+                        <x-ui.input id="v-table-to" type="date" name="date_to" icon="fa-calendar-check" value="{{ $table['filters']['date_to'] }}" />
                     </div>
                     <div class="col-span-2 lg:col-span-1">
                         <x-ui.label for="v-table-status" value="Status" />
                         <select id="v-table-status" name="status" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none">
                             <option value="">Semua status</option>
-                            <option value="ok">Aman - Basah</option>
-                            <option value="dry">Tanah kering</option>
-                            <option value="empty">Air Habis</option>
+                            <option value="ok" @selected($table['filters']['status'] === 'ok')>Aman - Basah</option>
+                            <option value="dry" @selected($table['filters']['status'] === 'dry')>Tanah kering</option>
+                            <option value="empty" @selected($table['filters']['status'] === 'empty')>Air Habis</option>
                         </select>
                     </div>
                     <div class="col-span-2 flex items-end gap-2 lg:col-span-1">
@@ -317,10 +319,12 @@
                             <i class="fa-solid fa-filter"></i>
                             Terapkan
                         </x-ui.button>
-                        <x-ui.button type="button" variant="secondary" id="v-table-reset" class="flex-1 lg:flex-none">Reset</x-ui.button>
+                        <a href="{{ route('visitor', ['days' => $days]) }}#tabel" class="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 lg:flex-none">Reset</a>
                     </div>
                 </form>
-                <p id="v-table-error" class="hidden px-4 pt-3 sm:px-6 text-sm text-red-600"></p>
+                @if ($table['error'])
+                    <p class="px-4 pt-3 text-sm text-red-600 sm:px-6">{{ $table['error'] }} Filter diabaikan.</p>
+                @endif
 
                 <ul id="v-table-cards" class="divide-y divide-slate-100 sm:hidden"></ul>
 
@@ -331,8 +335,8 @@
                                 <th class="px-6 py-3 font-medium">Waktu</th>
                                 <th class="px-4 py-3 font-medium">Kelembaban Tanah</th>
                                 <th class="px-4 py-3 font-medium">Air Tandon</th>
-                                <th class="px-4 py-3 font-medium">Suhu</th>
-                                <th class="px-4 py-3 font-medium">Kelembaban Udara</th>
+                                <th class="px-4 py-3 font-medium">Suhu Tanah</th>
+                                <th class="px-4 py-3 font-medium">Buzzer</th>
                                 <th class="px-4 py-3 font-medium">Pompa</th>
                                 <th class="px-4 py-3 font-medium">Mode</th>
                                 <th class="px-4 py-3 font-medium">Status</th>
@@ -346,11 +350,11 @@
                 <div class="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-4 text-sm sm:px-6">
                     <p id="v-table-page" class="text-xs text-slate-500 sm:text-sm">-</p>
                     <div class="flex gap-2">
-                        <x-ui.button variant="secondary" id="v-table-prev" aria-label="Halaman sebelumnya" disabled>
+                        <x-ui.button variant="secondary" id="v-table-prev" aria-label="Halaman sebelumnya" :disabled="! $table['links']['prev']">
                             <i class="fa-solid fa-chevron-left"></i>
                             <span class="hidden sm:inline">Sebelumnya</span>
                         </x-ui.button>
-                        <x-ui.button variant="secondary" id="v-table-next" aria-label="Halaman berikutnya" disabled>
+                        <x-ui.button variant="secondary" id="v-table-next" aria-label="Halaman berikutnya" :disabled="! $table['links']['next']">
                             <span class="hidden sm:inline">Berikutnya</span>
                             <i class="fa-solid fa-chevron-right"></i>
                         </x-ui.button>
@@ -432,7 +436,6 @@
         <x-sensor-stream />
         <script>
             (() => {
-                const RECORDS_URL = @json(url('/api/sensor'));
                 const CLOCK_TICK_MS = 5000;
                 const STALE_AFTER_MS = 60000;
                 const RECENT_LIMIT = 30;
@@ -443,7 +446,7 @@
                 const setText = (id, value) => { $(id).textContent = value; };
                 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
                 const number = (value, decimals = 1) => Number(value).toLocaleString('id-ID', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-                const hasDht = (d) => d.temperature !== null && d.humidity !== null;
+                const hasSoilTemperature = (d) => d.soil_temperature !== null && d.soil_temperature !== undefined;
                 // The float switch is on/off only, so the tank shows "full enough" or "empty".
                 const waterLevel = (d) => (d.is_water_empty ? 8 : 75);
 
@@ -503,10 +506,8 @@
 
                 /* ---------- Live cards ---------- */
 
-                const { pumpState, pumpModeLabel } = window.SensorStream;
+                const { pumpState, pumpModeLabel, soilTemperatureLevel, buzzerReason } = window.SensorStream;
 
-                const temperatureLabel = (t) => (t < 20 ? 'Sejuk' : t <= 30 ? 'Normal' : t <= 35 ? 'Hangat' : 'Panas');
-                const humidityLabel = (h) => (h < 40 ? 'Udara kering' : h <= 70 ? 'Ideal' : 'Udara lembab');
 
                 const renderLatest = (d) => {
                     const state = pumpState(d);
@@ -521,18 +522,20 @@
                     $('v-water-fill').style.height = waterLevel(d) + '%';
                     setText('v-water-label', d.is_water_empty ? 'Air habis, perlu diisi' : 'Air tersedia');
 
-                    if (hasDht(d)) {
-                        setText('v-temp', number(d.temperature));
-                        $('v-temp-bar').style.height = clamp((d.temperature / 50) * 100, 0, 100) + '%';
-                        setText('v-temp-label', temperatureLabel(d.temperature) + ' · Sensor DHT');
-
-                        setText('v-hum', Math.round(d.humidity));
-                        $('v-hum-clip').style.clipPath = 'inset(' + (100 - clamp(d.humidity, 0, 100)) + '% 0 0 0)';
-                        setText('v-hum-label', humidityLabel(d.humidity) + ' · Sensor DHT');
+                    if (hasSoilTemperature(d)) {
+                        setText('v-soil-temp', number(d.soil_temperature));
+                        $('v-soil-temp-bar').style.height = clamp((d.soil_temperature / 50) * 100, 0, 100) + '%';
+                        setText('v-soil-temp-label', soilTemperatureLevel(d.soil_temperature).label + ' · Sensor DS18B20');
                     } else {
-                        setText('v-temp-label', 'Sensor DHT tidak terbaca');
-                        setText('v-hum-label', 'Sensor DHT tidak terbaca');
+                        setText('v-soil-temp-label', 'Sensor DS18B20 tidak terbaca');
                     }
+
+                    const hasBuzzer = d.buzzer_alarm !== null && d.buzzer_alarm !== undefined;
+                    setText('v-buzzer', hasBuzzer ? (d.buzzer_alarm ? 'BERBUNYI' : 'DIAM') : '--');
+                    $('v-buzzer').className = 'text-base font-bold sm:text-xl ' + (d.buzzer_alarm ? 'text-amber-500' : 'text-slate-400');
+                    $('v-buzzer-icon').className = 'flex h-14 w-14 items-center justify-center rounded-full text-2xl transition sm:h-20 sm:w-20 sm:text-4xl '
+                        + (d.buzzer_alarm ? 'animate-pulse bg-amber-400 text-white' : 'bg-slate-100 text-slate-300');
+                    setText('v-buzzer-label', d.buzzer_alarm ? (buzzerReason(d) ?? 'Kondisi alarm') : hasBuzzer ? 'Tidak ada kondisi alarm' : 'Firmware belum mengirim status');
 
                     setText('v-pump-text', state.text);
                     setText('v-pump-mode', pumpModeLabel(d.pump_command));
@@ -572,7 +575,7 @@
 
                 /* ---------- Charts ---------- */
 
-                const COLORS = { soil: '#2563eb', temperature: '#f97316', humidity: '#06b6d4' };
+                const COLORS = { soil: '#2563eb', temperature: '#f97316' };
                 const axis = { grid: { color: '#f1f5f9' }, border: { display: false }, ticks: { color: '#94a3b8' } };
                 const tooltip = { backgroundColor: '#0f172a', padding: 12, cornerRadius: 10, usePointStyle: true };
                 const legend = { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, color: '#475569' } };
@@ -585,8 +588,7 @@
                         labels: daily.map((d) => d.label),
                         datasets: [
                             { type: 'bar', label: 'Tanah (%)', data: daily.map((d) => d.avg_soil), backgroundColor: COLORS.soil + '33', borderColor: COLORS.soil, borderWidth: 1.5, borderRadius: 6, yAxisID: 'percent', order: 3 },
-                            { type: 'line', label: 'Suhu (°C)', data: daily.map((d) => d.avg_temperature), borderColor: COLORS.temperature, backgroundColor: COLORS.temperature, tension: 0.4, spanGaps: true, yAxisID: 'temperature', order: 1 },
-                            { type: 'line', label: 'Udara (%)', data: daily.map((d) => d.avg_humidity), borderColor: COLORS.humidity, backgroundColor: COLORS.humidity, borderDash: [6, 4], tension: 0.4, spanGaps: true, yAxisID: 'percent', order: 2 },
+                            { type: 'line', label: 'Suhu tanah (°C)', data: daily.map((d) => d.avg_soil_temperature), borderColor: COLORS.temperature, backgroundColor: COLORS.temperature, tension: 0.4, spanGaps: true, yAxisID: 'temperature', order: 1 },
                         ],
                     },
                     options: {
@@ -608,8 +610,8 @@
                     data: {
                         labels: [],
                         datasets: [
-                            { label: 'Suhu (°C)', data: [], borderColor: COLORS.temperature, backgroundColor: COLORS.temperature + '22', fill: true, tension: 0.4, pointRadius: 0, spanGaps: true, yAxisID: 'temperature' },
-                            { label: 'Kelembaban udara (%)', data: [], borderColor: COLORS.humidity, backgroundColor: COLORS.humidity, borderDash: [6, 4], tension: 0.4, pointRadius: 0, spanGaps: true, yAxisID: 'percent' },
+                            { label: 'Suhu tanah (°C)', data: [], borderColor: COLORS.temperature, backgroundColor: COLORS.temperature + '22', fill: true, tension: 0.4, pointRadius: 0, spanGaps: true, yAxisID: 'temperature' },
+                            { label: 'Kelembaban tanah (%)', data: [], borderColor: COLORS.soil, backgroundColor: COLORS.soil, borderDash: [6, 4], tension: 0.4, pointRadius: 0, spanGaps: true, yAxisID: 'percent' },
                         ],
                     },
                     options: {
@@ -628,8 +630,8 @@
 
                 const renderLiveChart = () => {
                     liveChart.data.labels = rows.map((d) => d.time_label);
-                    liveChart.data.datasets[0].data = rows.map((d) => d.temperature);
-                    liveChart.data.datasets[1].data = rows.map((d) => d.humidity);
+                    liveChart.data.datasets[0].data = rows.map((d) => d.soil_temperature ?? null);
+                    liveChart.data.datasets[1].data = rows.map((d) => d.soil_percent);
                     liveChart.update();
                 };
 
@@ -646,6 +648,7 @@
                 const pushReading = (row) => {
                     rows = [...rows, row].slice(-RECENT_LIMIT);
                     render();
+                    prependLiveRow(row);
                 };
 
                 const onStreamStatus = (state) => {
@@ -655,8 +658,9 @@
 
                 /* ---------- Data table ---------- */
 
-                const tableFilters = { date_from: '', date_to: '', status: '' };
-                let tablePage = 1;
+                const table = @json($table);
+                const tableFilters = table.filters;
+                let tableRows = table.data;
 
                 const tableCell = (text, classes = 'px-4 py-3 text-slate-600') => {
                     const td = document.createElement('td');
@@ -694,10 +698,10 @@
                     stats.className = 'mt-2 grid grid-cols-5 gap-1 text-center';
                     [
                         ['Tanah', d.soil_percent + '%'],
-                        ['Suhu', d.temperature === null ? '--' : number(d.temperature) + '°'],
-                        ['Udara', d.humidity === null ? '--' : Math.round(d.humidity) + '%'],
+                        ['Suhu', hasSoilTemperature(d) ? number(d.soil_temperature) + '°' : '--'],
                         ['Air', d.is_water_empty ? 'Habis' : 'Ada'],
                         ['Pompa', d.pump_status ? 'ON' : 'OFF'],
+                        ['Buzzer', d.buzzer_alarm === null || d.buzzer_alarm === undefined ? '--' : d.buzzer_alarm ? 'ON' : 'OFF'],
                     ].forEach(([label, value]) => {
                         const cell = document.createElement('div');
                         cell.className = 'rounded-lg bg-slate-50 px-1 py-1.5';
@@ -715,65 +719,75 @@
                     return li;
                 };
 
-                const loadTable = async () => {
-                    const params = new URLSearchParams({ page: tablePage, per_page: 10 });
-                    Object.entries(tableFilters).forEach(([key, value]) => value && params.set(key, value));
-                    $('v-table-error').classList.add('hidden');
+                const tableRow = (d) => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'transition-colors duration-1000 hover:bg-slate-50';
+                    tr.append(
+                        tableCell(d.created_at_label, 'whitespace-nowrap px-6 py-3 text-slate-600'),
+                        tableCell(d.soil_percent + '%', 'px-4 py-3 font-semibold text-slate-900'),
+                        badgeCell(d.is_water_empty ? 'Habis' : 'Ada', d.is_water_empty ? 'bg-red-100 text-red-700' : 'bg-sky-100 text-sky-700'),
+                        tableCell(hasSoilTemperature(d) ? number(d.soil_temperature) + ' °C' : '--'),
+                        d.buzzer_alarm === null || d.buzzer_alarm === undefined
+                            ? tableCell('--')
+                            : badgeCell(d.buzzer_alarm ? 'ALARM' : 'Diam', d.buzzer_alarm ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'),
+                        badgeCell(d.pump_status ? 'ON' : 'OFF', d.pump_status ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'),
+                        tableCell(d.pump_command ? pumpModeLabel(d.pump_command) : '--', 'whitespace-nowrap px-4 py-3 text-slate-600'),
+                        badgeCell(pumpState(d).label, pumpState(d).badge),
+                    );
+                    return tr;
+                };
 
-                    try {
-                        const response = await fetch(RECORDS_URL + '?' + params, { headers: { Accept: 'application/json' }, cache: 'no-store' });
-                        const result = await response.json();
+                /**
+                 * Rows come with the page (no API); a highlighted row is a live MQTT reading.
+                 */
+                const renderTable = (highlight = null) => {
+                    const meta = table.meta;
+                    $('v-table-body').replaceChildren(...tableRows.map((d) => {
+                        const tr = tableRow(d);
+                        if (d === highlight) tr.classList.add('bg-brand-50');
+                        return tr;
+                    }));
+                    $('v-table-cards').replaceChildren(...tableRows.map(mobileRow));
+                    $('v-table-empty').classList.toggle('hidden', tableRows.length > 0);
+                    setText('v-table-summary', meta.total.toLocaleString('id-ID') + ' data ditemukan' + (tableFilters.q ? ' untuk "' + tableFilters.q + '"' : '') + ', terbaru di atas.');
+                    setText('v-table-page', meta.total ? 'Menampilkan ' + meta.from + '–' + meta.to + ' dari ' + meta.total.toLocaleString('id-ID') + ' · Hal. ' + meta.current_page + '/' + meta.last_page : 'Tidak ada data');
 
-                        if (!response.ok) {
-                            throw new Error(Object.values(result.errors || {}).flat()[0] || 'Gagal memuat data.');
-                        }
-
-                        const meta = result.meta;
-                        $('v-table-body').replaceChildren(...result.data.map((d) => {
-                            const tr = document.createElement('tr');
-                            tr.className = 'hover:bg-slate-50';
-                            tr.append(
-                                tableCell(d.created_at_label, 'whitespace-nowrap px-6 py-3 text-slate-600'),
-                                tableCell(d.soil_percent + '%', 'px-4 py-3 font-semibold text-slate-900'),
-                                badgeCell(d.is_water_empty ? 'Habis' : 'Ada', d.is_water_empty ? 'bg-red-100 text-red-700' : 'bg-sky-100 text-sky-700'),
-                                tableCell(d.temperature === null ? '--' : number(d.temperature) + ' °C'),
-                                tableCell(d.humidity === null ? '--' : Math.round(d.humidity) + '%'),
-                                badgeCell(d.pump_status ? 'ON' : 'OFF', d.pump_status ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'),
-                                tableCell(d.pump_command ? pumpModeLabel(d.pump_command) : '--', 'whitespace-nowrap px-4 py-3 text-slate-600'),
-                                badgeCell(pumpState(d).label, pumpState(d).badge),
-                            );
-                            return tr;
-                        }));
-
-                        $('v-table-cards').replaceChildren(...result.data.map(mobileRow));
-
-                        $('v-table-empty').classList.toggle('hidden', result.data.length > 0);
-                        setText('v-table-summary', meta.total.toLocaleString('id-ID') + ' data ditemukan, terbaru di atas.');
-                        setText('v-table-page', meta.total ? 'Menampilkan ' + meta.from + '–' + meta.to + ' dari ' + meta.total.toLocaleString('id-ID') + ' · Hal. ' + meta.current_page + '/' + meta.last_page : 'Tidak ada data');
-                        $('v-table-prev').disabled = meta.current_page <= 1;
-                        $('v-table-next').disabled = meta.current_page >= meta.last_page;
-                    } catch (error) {
-                        setText('v-table-error', error.message);
-                        $('v-table-error').classList.remove('hidden');
+                    if (highlight) {
+                        setTimeout(() => $('v-table-body').querySelectorAll('tr.bg-brand-50').forEach((tr) => tr.classList.remove('bg-brand-50')), 1500);
                     }
                 };
 
-                const applyTableFilters = () => {
-                    tableFilters.date_from = $('v-table-from').value;
-                    tableFilters.date_to = $('v-table-to').value;
-                    tableFilters.status = $('v-table-status').value;
-                    tablePage = 1;
-                    loadTable();
+                const conditionOf = (d) => (d.is_water_empty ? 'empty' : d.is_soil_dry ? 'dry' : 'ok');
+
+                /**
+                 * A live MQTT reading joins the first page when it matches the active filter.
+                 */
+                const prependLiveRow = (row) => {
+                    const today = toYmd(new Date());
+                    const matchesFilter = !tableFilters.q
+                        && (!tableFilters.date_to || tableFilters.date_to >= today)
+                        && (!tableFilters.date_from || tableFilters.date_from <= today)
+                        && (!tableFilters.status || tableFilters.status === conditionOf(row));
+
+                    if (table.meta.current_page !== 1 || !matchesFilter) {
+                        return;
+                    }
+
+                    tableRows = [row, ...tableRows].slice(0, table.meta.per_page);
+                    table.meta.total += 1;
+                    table.meta.from = 1;
+                    table.meta.to = tableRows.length;
+                    renderTable(row);
                 };
 
-                $('v-table-form').addEventListener('submit', (event) => {
-                    event.preventDefault();
-                    applyTableFilters();
+                $('v-table-form').addEventListener('submit', () => {
+                    // Empty fields would otherwise end up in the URL as ?date_from=&status=
+                    $('v-table-form').querySelectorAll('input, select').forEach((field) => { field.disabled = !field.value; });
                 });
 
-                $('v-table-reset').addEventListener('click', () => {
-                    $('v-table-form').reset();
-                    applyTableFilters();
+                // Re-enable the fields when the page comes back from the browser's back/forward cache.
+                window.addEventListener('pageshow', () => {
+                    $('v-table-form').querySelectorAll('input, select').forEach((field) => { field.disabled = false; });
                 });
 
                 document.querySelectorAll('#v-table-quick button').forEach((button) => {
@@ -785,45 +799,23 @@
                             all: ['', ''],
                         };
                         [$('v-table-from').value, $('v-table-to').value] = ranges[button.dataset.quick];
-                        applyTableFilters();
+                        $('v-table-form').requestSubmit();
                     });
                 });
 
-                $('v-table-prev').addEventListener('click', () => { tablePage -= 1; loadTable(); });
-                $('v-table-next').addEventListener('click', () => { tablePage += 1; loadTable(); });
+                $('v-table-prev').addEventListener('click', () => { if (table.links.prev) window.location = table.links.prev; });
+                $('v-table-next').addEventListener('click', () => { if (table.links.next) window.location = table.links.next; });
 
                 /* ---------- CSV export ---------- */
 
                 const exportForm = $('v-export-form');
-                let exportCountTimer = null;
 
                 const updateExportSummary = () => {
-                    clearTimeout(exportCountTimer);
-                    exportCountTimer = setTimeout(async () => {
-                        const selected = exportForm.querySelectorAll('input[name="datasets[]"]:checked').length;
-                        $('v-export-submit').disabled = selected === 0;
-
-                        if (selected === 0) {
-                            setText('v-export-summary', 'Pilih minimal satu jenis data.');
-                            return;
-                        }
-
-                        const params = new URLSearchParams({ per_page: 5 });
-                        ['date_from', 'date_to'].forEach((key) => {
-                            const value = exportForm.elements[key].value;
-                            if (value) params.set(key, value);
-                        });
-
-                        try {
-                            const response = await fetch(RECORDS_URL + '?' + params, { headers: { Accept: 'application/json' } });
-                            const result = await response.json();
-                            setText('v-export-summary', response.ok
-                                ? result.meta.total.toLocaleString('id-ID') + ' baris · ' + selected + ' jenis data akan di-download.'
-                                : Object.values(result.errors || {}).flat()[0] || 'Tidak dapat menghitung jumlah data.');
-                        } catch (error) {
-                            setText('v-export-summary', 'Tidak dapat menghitung jumlah data.');
-                        }
-                    }, 300);
+                    const selected = exportForm.querySelectorAll('input[name="datasets[]"]:checked').length;
+                    $('v-export-submit').disabled = selected === 0;
+                    setText('v-export-summary', selected === 0
+                        ? 'Pilih minimal satu jenis data.'
+                        : selected + ' jenis data akan di-download. Kolom id & waktu selalu disertakan.');
                 };
 
                 exportForm.addEventListener('change', updateExportSummary);
@@ -846,7 +838,7 @@
                 $('v-export-from').max = $('v-export-to').max = toYmd(new Date());
                 $('v-table-from').max = $('v-table-to').max = toYmd(new Date());
                 updateExportSummary();
-                loadTable();
+                renderTable();
                 render();
                 window.SensorStream.connect({ onReading: pushReading, onStatus: onStreamStatus });
                 // Keeps "x dtk lalu" fresh and flips to Offline when the ESP32 stops publishing.

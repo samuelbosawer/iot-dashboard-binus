@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Resources\SensorDataResource;
 use App\Models\SensorData;
 use App\Services\SensorReadingIngestor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -78,6 +79,25 @@ test('a failed dht read sent as zeros is stored without temperature and humidity
 
     expect($reading->temperature)->toBeNull()
         ->and($reading->humidity)->toBeNull();
+});
+
+test('firmware v3 soil temperature and buzzer alarm are stored, dht is kept but never sent to the pages', function () {
+    $reading = ingestMqttMessage(firmwareMessage(['soil_temperature' => 27.81, 'soil_temperature_valid' => true, 'buzzer_alarm' => true]));
+
+    expect($reading->soil_temperature)->toBe(27.81)
+        ->and($reading->buzzer_alarm)->toBeTrue()
+        ->and($reading->temperature)->toBe(29.4);
+
+    expect(SensorDataResource::make($reading)->resolve())
+        ->toMatchArray(['soil_temperature' => 27.81, 'buzzer_alarm' => true])
+        ->not->toHaveKeys(['temperature', 'humidity']);
+});
+
+test('a failed ds18b20 read is stored without soil temperature and old firmware leaves the buzzer empty', function () {
+    $reading = ingestMqttMessage(firmwareMessage(['soil_temperature' => 0, 'soil_temperature_valid' => false]));
+
+    expect($reading->soil_temperature)->toBeNull()
+        ->and($reading->buzzer_alarm)->toBeNull();
 });
 
 test('invalid messages are rejected and nothing is stored', function (string $message, string $exception) {
