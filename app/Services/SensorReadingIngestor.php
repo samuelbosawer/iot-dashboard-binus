@@ -13,6 +13,11 @@ use JsonException;
 class SensorReadingIngestor
 {
     /**
+     * Soil moisture below this percentage counts as dry (firmware BATAS_KERING).
+     */
+    private const SOIL_DRY_PERCENT = 35;
+
+    /**
      * Decode, normalise, validate and store one sensor message.
      *
      * @throws JsonException when the message is not valid JSON
@@ -36,7 +41,9 @@ class SensorReadingIngestor
      * - relay_d23 is the real pump state ("pump_status" is sent as "ON"/"OFF"),
      * - lamp D25 lights while the pump runs and lamp D14 when the tank is empty,
      * - a failed DHT read is sent as 0 °C / 0 % and stored as "no reading" (DHT is stored but not shown),
-     * - a failed DS18B20 read is flagged by soil_temperature_valid = false and stored as "no reading",
+     * - a failed DS18B20 read is flagged by soil_temperature_valid = false, or sent as 0 °C by firmware
+     *   without that flag, and stored as "no reading",
+     * - is_soil_dry is derived from soil_percent (firmware BATAS_KERING) when the firmware does not send it,
      * - buzzer_alarm (firmware v3) is kept as sent, or left empty for older firmware.
      *
      * @param  array<string, mixed>  $payload
@@ -49,8 +56,16 @@ class SensorReadingIngestor
             $payload['humidity'] = null;
         }
 
-        if (($payload['soil_temperature_valid'] ?? true) === false) {
+        $isSoilTemperatureFailed = array_key_exists('soil_temperature_valid', $payload)
+            ? $payload['soil_temperature_valid'] === false
+            : is_numeric($payload['soil_temperature'] ?? null) && (float) $payload['soil_temperature'] === 0.0;
+
+        if ($isSoilTemperatureFailed) {
             $payload['soil_temperature'] = null;
+        }
+
+        if (! array_key_exists('is_soil_dry', $payload) && is_numeric($payload['soil_percent'] ?? null)) {
+            $payload['is_soil_dry'] = (int) $payload['soil_percent'] < self::SOIL_DRY_PERCENT;
         }
 
         if (array_key_exists('buzzer_alarm', $payload)) {

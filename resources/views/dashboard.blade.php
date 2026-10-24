@@ -426,7 +426,6 @@
                         <th class="px-4 py-3 font-medium">Mode</th>
                         <th class="px-4 py-3 font-medium">D25</th>
                         <th class="px-4 py-3 font-medium">D14</th>
-                        <th class="px-4 py-3 font-medium">Buzzer</th>
                         <th class="px-4 py-3 font-medium">Status</th>
                     </tr>
                 </thead>
@@ -956,7 +955,6 @@
                             cell(d.pump_command ? pumpModeLabel(d.pump_command) : '--', 'whitespace-nowrap px-4 py-3 text-slate-600'),
                             onOffCell(d.lampu1_d25),
                             onOffCell(d.lampu2_d14),
-                            d.buzzer_alarm === null || d.buzzer_alarm === undefined ? cell('--') : onOffCell(d.buzzer_alarm),
                         );
 
                         const statusCell = document.createElement('td');

@@ -336,7 +336,6 @@
                                 <th class="px-4 py-3 font-medium">Kelembaban Tanah</th>
                                 <th class="px-4 py-3 font-medium">Air Tandon</th>
                                 <th class="px-4 py-3 font-medium">Suhu Tanah</th>
-                                <th class="px-4 py-3 font-medium">Buzzer</th>
                                 <th class="px-4 py-3 font-medium">Pompa</th>
                                 <th class="px-4 py-3 font-medium">Mode</th>
                                 <th class="px-4 py-3 font-medium">Status</th>
@@ -695,13 +694,12 @@
                     head.append(time, badge);
 
                     const stats = document.createElement('dl');
-                    stats.className = 'mt-2 grid grid-cols-5 gap-1 text-center';
+                    stats.className = 'mt-2 grid grid-cols-4 gap-1 text-center';
                     [
                         ['Tanah', d.soil_percent + '%'],
                         ['Suhu', hasSoilTemperature(d) ? number(d.soil_temperature) + '°' : '--'],
                         ['Air', d.is_water_empty ? 'Habis' : 'Ada'],
                         ['Pompa', d.pump_status ? 'ON' : 'OFF'],
-                        ['Buzzer', d.buzzer_alarm === null || d.buzzer_alarm === undefined ? '--' : d.buzzer_alarm ? 'ON' : 'OFF'],
                     ].forEach(([label, value]) => {
                         const cell = document.createElement('div');
                         cell.className = 'rounded-lg bg-slate-50 px-1 py-1.5';
@@ -727,9 +725,6 @@
                         tableCell(d.soil_percent + '%', 'px-4 py-3 font-semibold text-slate-900'),
                         badgeCell(d.is_water_empty ? 'Habis' : 'Ada', d.is_water_empty ? 'bg-red-100 text-red-700' : 'bg-sky-100 text-sky-700'),
                         tableCell(hasSoilTemperature(d) ? number(d.soil_temperature) + ' °C' : '--'),
-                        d.buzzer_alarm === null || d.buzzer_alarm === undefined
-                            ? tableCell('--')
-                            : badgeCell(d.buzzer_alarm ? 'ALARM' : 'Diam', d.buzzer_alarm ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'),
                         badgeCell(d.pump_status ? 'ON' : 'OFF', d.pump_status ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'),
                         tableCell(d.pump_command ? pumpModeLabel(d.pump_command) : '--', 'whitespace-nowrap px-4 py-3 text-slate-600'),
                         badgeCell(pumpState(d).label, pumpState(d).badge),

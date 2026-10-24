@@ -100,6 +100,19 @@ test('a failed ds18b20 read is stored without soil temperature and old firmware 
         ->and($reading->buzzer_alarm)->toBeNull();
 });
 
+test('firmware without is_soil_dry and soil_temperature_valid is stored with derived values', function (array $overrides, bool $isSoilDry, ?float $soilTemperature) {
+    $payload = json_decode(firmwareMessage($overrides), true);
+    unset($payload['is_soil_dry'], $payload['relay_d23'], $payload['water_raw']);
+
+    $reading = ingestMqttMessage(json_encode($payload));
+
+    expect($reading->is_soil_dry)->toBe($isSoilDry)
+        ->and($reading->soil_temperature)->toBe($soilTemperature);
+})->with([
+    'dry soil with ds18b20 reading' => [['soil_percent' => 20, 'soil_temperature' => 27.5], true, 27.5],
+    'wet soil with failed ds18b20 sent as 0' => [['soil_percent' => 60, 'soil_temperature' => 0], false, null],
+]);
+
 test('invalid messages are rejected and nothing is stored', function (string $message, string $exception) {
     expect(fn () => ingestMqttMessage($message))->toThrow($exception);
 

@@ -7,7 +7,8 @@
 <script>
     window.SensorStream = (() => {
         const CONFIG = @json($streamConfig);
-        const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const SOIL_DRY_PERCENT = 35;
+        const MONTHS =['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const pad = (value) => String(value).padStart(2, '0');
         const toBoolean = (value) => value === true || value === 1 || value === '1' || value === 'ON' || value === 'true';
 
@@ -16,8 +17,9 @@
          */
         const normalize = (payload, receivedAt = new Date()) => {
             {{-- DHT11 air temperature / humidity are stored by the server but never shown. --}}
-            const hasSoilTemperature = payload.soil_temperature_valid !== false
-                && payload.soil_temperature !== null && payload.soil_temperature !== undefined;
+            {{-- Firmware without soil_temperature_valid sends a failed DS18B20 read as 0 °C. --}}
+            const hasSoilTemperature = payload.soil_temperature !== null && payload.soil_temperature !== undefined
+                && ('soil_temperature_valid' in payload ? payload.soil_temperature_valid !== false : Number(payload.soil_temperature) !== 0);
             const pump = 'relay_d23' in payload ? toBoolean(payload.relay_d23) : toBoolean(payload.pump_status);
             const isWaterEmpty = toBoolean(payload.is_water_empty);
             const time = pad(receivedAt.getHours()) + ':' + pad(receivedAt.getMinutes()) + ':' + pad(receivedAt.getSeconds());
@@ -29,7 +31,7 @@
                 soil_temperature: hasSoilTemperature ? Number(payload.soil_temperature) : null,
                 water_raw: payload.water_raw ?? null,
                 is_water_empty: isWaterEmpty,
-                is_soil_dry: toBoolean(payload.is_soil_dry),
+                is_soil_dry: 'is_soil_dry' in payload ? toBoolean(payload.is_soil_dry) : Number(payload.soil_percent) < SOIL_DRY_PERCENT,
                 pump_status: pump,
                 pump_command: payload.pump_command ?? null,
                 lampu1_d25: 'lampu1_d25' in payload ? toBoolean(payload.lampu1_d25) : pump,
