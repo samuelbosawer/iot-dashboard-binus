@@ -37,10 +37,12 @@ test('the android app is sent back to the home page instead of the download page
 test('the navbar links to the download page in web browsers only', function () {
     $this->withHeader('User-Agent', BROWSER_USER_AGENT)
         ->get(route('prediction'))
-        ->assertSee(route('app-download'));
+        ->assertSee(route('app-download'))
+        ->assertSee('Download CSV');
 
     $this->withHeader('User-Agent', MOBILE_APP_USER_AGENT)
         ->get(route('prediction'))
         ->assertOk()
-        ->assertDontSee(route('app-download'));
+        ->assertDontSee(route('app-download'))
+        ->assertSee(route('visitor').'#download');
 });
