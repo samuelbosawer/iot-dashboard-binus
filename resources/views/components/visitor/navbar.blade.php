@@ -31,6 +31,16 @@
         </nav>
 
         <div class="flex items-center gap-2">
+            @unless (\App\Http\Middleware\EnsureWebBrowser::isMobileApp(request()))
+                <a href="{{ route('app-download') }}" @class([
+                    'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-white ring-1 ring-white/20 transition',
+                    'bg-white/25' => request()->routeIs('app-download'),
+                    'bg-white/10 hover:bg-white/20' => ! request()->routeIs('app-download'),
+                ]) title="Download aplikasi Android">
+                    <i class="fa-brands fa-android"></i>
+                    <span class="hidden sm:inline">Aplikasi Android</span>
+                </a>
+            @endunless
             <button type="button" data-pwa-install hidden class="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20" title="Install aplikasi">
                 <i class="fa-solid fa-mobile-screen-button"></i>
                 <span class="hidden sm:inline">Install App</span>

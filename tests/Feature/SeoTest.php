@@ -44,7 +44,8 @@ test('sitemap lists the public pages', function () {
         ->assertOk()
         ->assertHeader('Content-Type', 'application/xml; charset=UTF-8')
         ->assertSee('<loc>'.route('visitor').'</loc>', false)
-        ->assertSee('<loc>'.route('prediction').'</loc>', false);
+        ->assertSee('<loc>'.route('prediction').'</loc>', false)
+        ->assertSee('<loc>'.route('app-download').'</loc>', false);
 });
 
 test('the visitor page has the data table section', function () {

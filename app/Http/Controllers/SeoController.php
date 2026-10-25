@@ -36,6 +36,7 @@ class SeoController extends Controller
         $pages = [
             ['url' => route('visitor'), 'priority' => '1.0'],
             ['url' => route('prediction'), 'priority' => '0.8'],
+            ['url' => route('app-download'), 'priority' => '0.6'],
         ];
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n"

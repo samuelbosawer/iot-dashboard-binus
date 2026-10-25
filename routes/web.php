@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AppDownloadController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\SensorExportController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VisitorController;
+use App\Http\Middleware\EnsureWebBrowser;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [VisitorController::class, 'index'])->name('visitor');
@@ -20,6 +22,13 @@ Route::get('sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 Route::get('visitor/export', SensorExportController::class)
     ->middleware('throttle:10,1')
     ->name('visitor.export');
+
+Route::middleware(EnsureWebBrowser::class)->group(function () {
+    Route::get('aplikasi', [AppDownloadController::class, 'show'])->name('app-download');
+    Route::get('aplikasi/download', [AppDownloadController::class, 'download'])
+        ->middleware('throttle:10,1')
+        ->name('app-download.file');
+});
 
 // Connection check for the Docker InfluxDB; never exposed in production.
 if (! app()->isProduction()) {
