@@ -14,9 +14,13 @@ test('guests can open the prediction menu from the visitor site', function () {
         ->assertOk()
         ->assertSee('Prediksi Kelembaban Tanah')
         ->assertSee('Prediksi Air Tandon Habis')
-        ->assertSee('Mengumpulkan data');
+        ->assertSee('Prediksi Suhu Tanah')
+        ->assertSee('Mengumpulkan data')
+        ->assertSee('Fitur prediksi masih dalam tahap pengembangan')
+        ->assertSee('Rancangan tampilan');
 
-    expect($response->viewData('dataset'))->toMatchArray(['total' => 3, 'days' => 1, 'empty' => 1]);
+    expect($response->viewData('dataset'))->toMatchArray(['total' => 3, 'days' => 1, 'empty' => 1, 'soil_temperature' => 3])
+        ->and(collect($response->viewData('models'))->pluck('key')->all())->toBe(['soil', 'water', 'soil_temperature']);
 });
 
 test('the admin dashboard has a prediction menu that requires login', function () {

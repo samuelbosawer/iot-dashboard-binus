@@ -9,9 +9,9 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Machine learning prediction menu (first version): the planned soil and water models, a chart of the
- * real hourly sensor data with a linear trend baseline, and rule-based recommendations.
- * No trained model is used yet.
+ * Machine learning prediction menu (first version, still in development): the planned soil moisture, float switch
+ * and soil temperature models with a design-only preview of their results, a chart of the real hourly sensor data
+ * with a linear trend baseline, and rule-based recommendations. No trained model is used yet.
  */
 class PredictionController extends Controller
 {
@@ -69,12 +69,12 @@ class PredictionController extends Controller
     }
 
     /**
-     * @return array{total: int, days: int, dry: int, empty: int, first_at: ?string, last_at: ?string}
+     * @return array{total: int, days: int, dry: int, empty: int, soil_temperature: int, first_at: ?string, last_at: ?string}
      */
     private function dataset(): array
     {
         $row = SensorData::query()
-            ->selectRaw('COUNT(*) as total, MIN(created_at) as first_at, MAX(created_at) as last_at')
+            ->selectRaw('COUNT(*) as total, COUNT(soil_temperature) as soil_temperature_count, MIN(created_at) as first_at, MAX(created_at) as last_at')
             ->selectRaw('COUNT(DISTINCT DATE(created_at)) as days')
             ->selectRaw('SUM(CASE WHEN is_soil_dry = 1 THEN 1 ELSE 0 END) as dry_count')
             ->selectRaw('SUM(CASE WHEN is_water_empty = 1 THEN 1 ELSE 0 END) as empty_count')
@@ -86,6 +86,7 @@ class PredictionController extends Controller
             'days' => (int) $row->days,
             'dry' => (int) $row->dry_count,
             'empty' => (int) $row->empty_count,
+            'soil_temperature' => (int) $row->soil_temperature_count,
             'first_at' => $row->first_at,
             'last_at' => $row->last_at,
         ];
@@ -199,8 +200,11 @@ class PredictionController extends Controller
     }
 
     /**
-     * @param  array{total: int, days: int, empty: int}  $dataset
-     * @return list<array{key: string, title: string, icon: string, tone: string, target: string, features: list<string>, algorithm: string, requirements: list<array{label: string, current: int, required: int}>, ready: bool}>
+     * The planned model of each sensor. "outputs" are the results the model will show; until a model is
+     * trained the page only renders them as an empty design preview.
+     *
+     * @param  array{total: int, days: int, empty: int, soil_temperature: int}  $dataset
+     * @return list<array{key: string, title: string, sensor: string, icon: string, tone: string, target: string, features: list<string>, algorithm: string, outputs: list<array{label: string, unit: ?string}>, requirements: list<array{label: string, current: int, required: int}>, ready: bool}>
      */
     private function models(array $dataset): array
     {
@@ -211,25 +215,57 @@ class PredictionController extends Controller
             [
                 'key' => 'soil',
                 'title' => 'Prediksi Kelembaban Tanah',
+                'sensor' => 'Sensor soil moisture',
                 'icon' => 'fa-seedling',
                 'tone' => 'brand',
                 'target' => 'Memperkirakan kelembaban tanah (%) 1 jam ke depan, sehingga penyiraman bisa dijadwalkan sebelum tanah kering.',
                 'features' => ['Riwayat kelembaban tanah', 'Suhu tanah (DS18B20)', 'Status pompa', 'Jam dalam sehari'],
                 'algorithm' => 'Regresi (Linear Regression / Random Forest)',
+                'outputs' => [
+                    ['label' => 'Kelembaban 1 jam lagi', 'unit' => '%'],
+                    ['label' => 'Tanah kering dalam', 'unit' => 'jam'],
+                    ['label' => 'Saran penyiraman', 'unit' => null],
+                ],
                 'requirements' => [$readings, $days],
             ],
             [
                 'key' => 'water',
                 'title' => 'Prediksi Air Tandon Habis',
+                'sensor' => 'Water float switch',
                 'icon' => 'fa-water',
                 'tone' => 'sky',
                 'target' => 'Memperkirakan kapan float switch akan mendeteksi air tandon habis, sehingga tandon bisa diisi lebih awal.',
                 'features' => ['Durasi pompa menyala sejak tandon terisi', 'Frekuensi penyiraman', 'Suhu tanah', 'Riwayat status float switch'],
                 'algorithm' => 'Klasifikasi (Logistic Regression / Decision Tree)',
+                'outputs' => [
+                    ['label' => 'Peluang habis 24 jam', 'unit' => '%'],
+                    ['label' => 'Perkiraan habis dalam', 'unit' => 'jam'],
+                    ['label' => 'Saran isi tandon', 'unit' => null],
+                ],
                 'requirements' => [
                     $readings,
                     $days,
                     ['label' => 'Kejadian air habis', 'current' => $dataset['empty'], 'required' => self::MIN_EMPTY_EVENTS],
+                ],
+            ],
+            [
+                'key' => 'soil_temperature',
+                'title' => 'Prediksi Suhu Tanah',
+                'sensor' => 'Sensor suhu tanah DS18B20',
+                'icon' => 'fa-temperature-half',
+                'tone' => 'amber',
+                'target' => 'Memperkirakan suhu tanah (°C) 1 jam ke depan dan peluang melewati 32 °C (batas alarm buzzer), sehingga tanaman bisa dinaungi atau disiram lebih awal.',
+                'features' => ['Riwayat suhu tanah', 'Kelembaban tanah', 'Status pompa', 'Jam dalam sehari'],
+                'algorithm' => 'Regresi deret waktu (Linear Regression / Random Forest)',
+                'outputs' => [
+                    ['label' => 'Suhu 1 jam lagi', 'unit' => '°C'],
+                    ['label' => 'Peluang di atas 32 °C', 'unit' => '%'],
+                    ['label' => 'Kategori suhu', 'unit' => null],
+                ],
+                'requirements' => [
+                    $readings,
+                    $days,
+                    ['label' => 'Data suhu tanah terbaca', 'current' => $dataset['soil_temperature'], 'required' => self::MIN_READINGS],
                 ],
             ],
         ];

@@ -4,7 +4,11 @@
     $tones = [
         'brand' => ['icon' => 'bg-brand-50 text-brand-600', 'bar' => 'bg-brand-500'],
         'sky' => ['icon' => 'bg-sky-50 text-sky-600', 'bar' => 'bg-sky-500'],
+        'amber' => ['icon' => 'bg-amber-50 text-amber-600', 'bar' => 'bg-amber-500'],
     ];
+
+    // Heights (%) of the placeholder bars in the design-only result preview.
+    $previewBars = [40, 55, 48, 62, 70, 58, 66, 74, 60, 68, 52, 64];
 
     $recommendationTones = [
         'red' => 'border-red-200 bg-red-50 text-red-600',
@@ -25,6 +29,17 @@
 @endphp
 
 <div class="space-y-6">
+    {{-- Development notice --}}
+    <div class="flex items-start gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+            <i class="fa-solid fa-person-digging text-lg"></i>
+        </span>
+        <div>
+            <p class="text-sm font-semibold text-amber-900">Fitur prediksi masih dalam tahap pengembangan</p>
+            <p class="mt-1 text-sm text-amber-800">Model machine learning belum dilatih, sehingga hasil prediksi belum tersedia dan belum optimal. Kartu prediksi sensor di bawah ini masih berupa rancangan tampilan. Grafik tren dan rekomendasi dihitung dari aturan sederhana, bukan model ML.</p>
+        </div>
+    </div>
+
     {{-- Dataset readiness summary --}}
     <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
         @foreach ([
@@ -94,8 +109,13 @@
         </x-ui.card>
     </div>
 
-    {{-- Planned models --}}
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    {{-- Planned model per sensor --}}
+    <div>
+        <h2 class="text-base font-semibold text-slate-900">Prediksi per Sensor</h2>
+        <p class="text-xs text-slate-400">Kelembaban tanah, float switch air tandon, dan suhu tanah. Tampilan hasil masih rancangan sampai model selesai dilatih.</p>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 2xl:grid-cols-3">
         @foreach ($models as $model)
             @php
                 $tone = $tones[$model['tone']];
@@ -107,8 +127,8 @@
                     <div class="flex items-center gap-3">
                         <span class="flex h-12 w-12 items-center justify-center rounded-xl {{ $tone['icon'] }}"><i class="fa-solid {{ $model['icon'] }} text-lg"></i></span>
                         <div>
-                            <h2 class="text-base font-semibold text-slate-900">{{ $model['title'] }}</h2>
-                            <p class="text-xs text-slate-400">{{ $model['algorithm'] }}</p>
+                            <h3 class="text-base font-semibold text-slate-900">{{ $model['title'] }}</h3>
+                            <p class="text-xs text-slate-400">{{ $model['sensor'] }} · {{ $model['algorithm'] }}</p>
                         </div>
                     </div>
                     <span @class([
@@ -148,9 +168,40 @@
                     @endforeach
                 </div>
 
-                <div class="mt-5 flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
-                    <i class="fa-solid fa-flask text-slate-400"></i>
-                    Hasil prediksi akan tampil di sini setelah model dilatih dan diintegrasikan.
+                {{-- Design-only preview of the model results --}}
+                <div class="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs font-semibold tracking-wide text-slate-400 uppercase">Hasil prediksi</p>
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200">
+                            <i class="fa-solid fa-pen-ruler"></i>
+                            Rancangan tampilan
+                        </span>
+                    </div>
+
+                    <dl class="mt-3 grid grid-cols-3 gap-2">
+                        @foreach ($model['outputs'] as $output)
+                            <div class="rounded-lg bg-white p-2.5 ring-1 ring-slate-200">
+                                <dt class="text-[11px] leading-tight text-slate-400">{{ $output['label'] }}</dt>
+                                <dd class="mt-1 text-lg font-bold text-slate-300">--@if ($output['unit'])<span class="ml-0.5 text-xs font-medium">{{ $output['unit'] }}</span>@endif</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+
+                    <div class="mt-3 flex h-14 items-end gap-1" aria-hidden="true">
+                        @foreach ($previewBars as $height)
+                            <span class="flex-1 rounded-t {{ $tone['bar'] }} opacity-15" style="height: {{ $height }}%"></span>
+                        @endforeach
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+                        <span><i class="fa-solid fa-bullseye"></i> Akurasi model: --</span>
+                        <span><i class="fa-solid fa-clock-rotate-left"></i> Terakhir dilatih: --</span>
+                    </div>
+
+                    <p class="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                        <i class="fa-solid fa-flask text-slate-400"></i>
+                        Hasil prediksi akan tampil di sini setelah model dilatih dan diintegrasikan.
+                    </p>
                 </div>
             </x-ui.card>
         @endforeach
