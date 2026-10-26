@@ -1,8 +1,10 @@
 <x-layouts.guest title="Prediksi Machine Learning" description="Grafik data sensor asli, tren kelembaban tanah, rencana prediksi kelembaban tanah, air tandon, dan suhu tanah, serta rekomendasi perawatan tanaman.">
     <x-visitor.navbar />
 
-    <section class="bg-linear-to-br from-brand-600 via-brand-800 to-brand-900 text-white">
-        <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
+    <section class="relative overflow-hidden bg-linear-to-br from-brand-600 via-brand-800 to-brand-900 text-white">
+        <x-prediction.watermark />
+
+        <div class="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
             <span class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-widest text-brand-100 uppercase ring-1 ring-white/20">
                 <i class="fa-solid fa-brain"></i>
                 Machine Learning · Dalam Pengembangan
