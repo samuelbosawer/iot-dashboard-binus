@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\SensorDataset;
+use App\Enums\SensorStatusFilter;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -32,7 +33,7 @@ class ExportSensorDataRequest extends FormRequest
         return [
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
-            'status' => ['nullable', 'in:ok,dry,empty'],
+            'status' => ['nullable', Rule::enum(SensorStatusFilter::class)],
             'datasets' => ['required', 'array', 'min:1'],
             'datasets.*' => [Rule::enum(SensorDataset::class)],
         ];

@@ -151,7 +151,7 @@
                     'text-red-600' => $errors->has('command'),
                     'text-emerald-600' => session('status') && ! $errors->has('command'),
                     'text-slate-400' => ! session('status') && ! $errors->has('command'),
-                ])>{{ $errors->first('command') ?: session('status', 'Manual ON menyala terus sampai dikirim Otomatis atau Manual OFF.') }}</p>
+                ])>{{ $errors->first('command') ?: session('status', 'Manual ON mati sendiri setelah 60 detik atau saat air habis, lalu kembali Otomatis.') }}</p>
             </form>
         </x-ui.card>
     </div>
@@ -206,7 +206,7 @@
                     <p class="text-xs text-slate-400">alarm di data terakhir</p>
                 </div>
             </div>
-            <p class="mt-4 text-xs text-slate-400">Berbunyi terus selama air tandon habis <span class="font-semibold">atau</span> tanah kering, dan langsung diam saat kondisinya hilang.</p>
+            <p class="mt-4 text-xs text-slate-400">Berbunyi selama air tandon habis, tanah sangat kering (&lt; 40%) <span class="font-semibold">atau</span> suhu tanah di atas 32 °C, dan langsung diam saat kondisinya hilang.</p>
         </x-ui.card>
     </div>
 
@@ -342,10 +342,7 @@
                 <div>
                     <x-ui.label for="export-status" value="Status" />
                     <select id="export-status" name="status" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none">
-                        <option value="">Semua status</option>
-                        <option value="ok" @selected(old('status') === 'ok')>Aman - Basah</option>
-                        <option value="dry" @selected(old('status') === 'dry')>Tanah kering</option>
-                        <option value="empty" @selected(old('status') === 'empty')>Air Habis</option>
+                        <x-sensor-status-options :selected="old('status')" />
                     </select>
                 </div>
                 <div class="flex items-end">
@@ -380,8 +377,8 @@
                 <div class="col-span-full">
                     <x-ui.label for="filter-search" value="Cari data" />
                     <x-ui.input id="filter-search" type="search" name="q" icon="fa-magnifying-glass" maxlength="50" autocomplete="off"
-                        value="{{ $table['filters']['q'] }}" placeholder="Cari angka, tanggal, jam, status, atau mode pompa…" />
-                    <p class="mt-1 text-xs text-slate-400">Contoh: 35, 27.5, 2026-10-21, 14:05, kering, habis, menyiram, manual off, alarm</p>
+                        value="{{ $table['filters']['q'] }}" placeholder="Cari kelembaban, suhu tanah, tanggal, jam, status, mode pompa, atau buzzer…" />
+                    <p class="mt-1 text-xs text-slate-400">Contoh: 35%, 27,5 °C, 21 Oct 2026, 21/10/2026, 14:05, kering, tunggu jeda, air ada, habis, menyiram, manual off, alarm, ds18b20 error</p>
                 </div>
                 <div>
                     <x-ui.label for="filter-date-from" value="Dari tanggal" />
@@ -394,10 +391,7 @@
                 <div>
                     <x-ui.label for="filter-status" value="Status" />
                     <select id="filter-status" name="status" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none">
-                        <option value="">Semua status</option>
-                        <option value="ok" @selected($table['filters']['status'] === 'ok')>Aman - Basah</option>
-                        <option value="dry" @selected($table['filters']['status'] === 'dry')>Tanah kering</option>
-                        <option value="empty" @selected($table['filters']['status'] === 'empty')>Air Habis</option>
+                        <x-sensor-status-options :selected="$table['filters']['status']" />
                     </select>
                 </div>
                 <div class="flex items-end gap-2">
@@ -474,9 +468,9 @@
                 const ICON_TILE = 'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xl transition ';
                 const OFF = 'bg-slate-100 text-slate-500';
 
-                /** Labels of the history filter (soil / tank condition, not what the pump did). */
-                const FILTER_LABELS = { ok: 'Aman - Basah', dry: 'Tanah kering', empty: 'Air habis' };
-                const { pumpState, pumpModeLabel } = window.SensorStream;
+                /** Labels of the history "Status" filter (App\Enums\SensorStatusFilter). */
+                const FILTER_LABELS = @json(collect(\App\Enums\SensorStatusFilter::cases())->mapWithKeys(fn ($status) => [$status->value => $status->label()]));
+                const { pumpState, pumpModeLabel, matchesStatus } = window.SensorStream;
 
                 const $ = (id) => document.getElementById(id);
                 const setText = (id, value) => { $(id).textContent = value; };
@@ -526,7 +520,7 @@
 
                     setText('soil-percent', d.soil_percent);
                     setText('soil-raw', d.soil_raw);
-                    setText('soil-badge', d.is_soil_dry ? 'Kering (< 35%)' : 'Basah (≥ 35%)');
+                    setText('soil-badge', d.is_soil_dry ? 'Kering (< 55%)' : 'Basah (≥ 55%)');
                     setClass('soil-badge', 'mt-3 ' + PILL + (d.is_soil_dry ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'));
                     $('soil-gauge').style.strokeDashoffset = GAUGE_CIRCUMFERENCE * (1 - clamp(d.soil_percent, 0, 100) / 100);
                     $('soil-gauge').setAttribute('class', 'transition-all duration-700 ' + (d.is_soil_dry ? 'stroke-amber-500' : 'stroke-brand-500'));
@@ -988,8 +982,6 @@
                     return parts.length ? 'Filter: ' + parts.join(' · ') : 'Semua data, terbaru di atas';
                 };
 
-                const conditionOf = (d) => (d.is_water_empty ? 'empty' : d.is_soil_dry ? 'dry' : 'ok');
-
                 const renderTableMeta = () => {
                     const meta = table.meta;
                     setText('table-summary', describeFilters() + ' · ' + meta.total.toLocaleString('id-ID') + ' data');
@@ -1005,7 +997,7 @@
                     const matchesFilter = !filters.q
                         && (!filters.date_to || filters.date_to >= today)
                         && (!filters.date_from || filters.date_from <= today)
-                        && (!filters.status || filters.status === conditionOf(row));
+                        && matchesStatus(row, filters.status);
 
                     if (table.meta.current_page !== 1 || !matchesFilter) {
                         return;

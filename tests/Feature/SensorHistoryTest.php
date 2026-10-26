@@ -108,7 +108,52 @@ test('the history table can be searched by number, time and keyword', function (
     'manual off mode' => ['manual off', [60]],
     'buzzer alarm' => ['alarm', [20, 60]],
     'nothing found' => ['xyz', []],
+    'soil percent as shown' => ['35%', [35]],
+    'soil temperature as shown' => ['27,5 °C', [20]],
+    'date as shown in the table' => ['21 Oct 2026', [20, 60]],
+    'local date format' => ['20/10/2026', [35]],
+    'water available' => ['air ada', [20, 35]],
+    'quiet buzzer' => ['diam', [35]],
 ]);
+
+test('the history table can be searched for readings without a soil temperature', function () {
+    SensorData::factory()->create(['soil_percent' => 50]);
+    SensorData::factory()->withoutSoilTemperature()->create(['soil_percent' => 70]);
+
+    $table = $this->get(route('visitor', ['q' => 'ds18b20 error']))->assertOk()->viewData('table');
+
+    expect(collect($table['data'])->pluck('soil_percent')->all())->toBe([70]);
+});
+
+test('the history table status filter matches the status shown in the table', function (string $status, array $expected) {
+    SensorData::factory()->create(['soil_percent' => 60]);
+    SensorData::factory()->soilDry()->create(['soil_percent' => 20]);
+    SensorData::factory()->create(['soil_percent' => 25, 'is_soil_dry' => true]);
+    SensorData::factory()->waterEmpty()->create(['soil_percent' => 70]);
+    SensorData::factory()->create(['soil_percent' => 80, 'pump_status' => true, 'pump_command' => 'pump_on']);
+    SensorData::factory()->withoutSoilTemperature()->create(['soil_percent' => 90, 'pump_command' => 'pump_off']);
+
+    $table = $this->get(route('visitor', ['status' => $status]))->assertOk()->viewData('table');
+
+    expect(collect($table['data'])->pluck('soil_percent')->sort()->values()->all())->toBe($expected)
+        ->and($table['error'])->toBeNull();
+})->with([
+    'watering' => ['watering', [20]],
+    'dry soil waiting for the pause' => ['waiting', [25]],
+    'manual on' => ['manual_on', [80]],
+    'manual off' => ['manual_off', [90]],
+    'auto mode' => ['auto', [20, 25, 60, 70]],
+    'buzzer alarm' => ['alarm', [20, 70]],
+    'no soil temperature' => ['no_soil_temperature', [90]],
+]);
+
+test('the status select lists every status filter', function () {
+    $this->get(route('visitor'))
+        ->assertOk()
+        ->assertSee('<optgroup label="Pompa">', false)
+        ->assertSee('Kering - Tunggu Jeda')
+        ->assertSee('Suhu tanah tidak terbaca');
+});
 
 test('search combines with the other filters and is kept in the pagination links', function () {
     SensorData::factory()->count(20)->soilDry()->create(['created_at' => '2026-10-21 10:00:00']);

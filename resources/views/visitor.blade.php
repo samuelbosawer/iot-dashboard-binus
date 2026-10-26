@@ -294,8 +294,8 @@
                     <div class="col-span-full">
                         <x-ui.label for="v-table-search" value="Cari data" />
                         <x-ui.input id="v-table-search" type="search" name="q" icon="fa-magnifying-glass" maxlength="50" autocomplete="off"
-                            value="{{ $table['filters']['q'] }}" placeholder="Cari angka, tanggal, jam, atau status…" />
-                        <p class="mt-1 text-xs text-slate-400">Contoh: 35, 27.5, 2026-10-21, 14:05, kering, habis, menyiram, manual off, alarm</p>
+                            value="{{ $table['filters']['q'] }}" placeholder="Cari kelembaban, suhu tanah, tanggal, jam, atau status…" />
+                        <p class="mt-1 text-xs text-slate-400">Contoh: 35%, 27,5 °C, 21 Oct 2026, 21/10/2026, 14:05, kering, tunggu jeda, air ada, habis, menyiram, manual off, alarm</p>
                     </div>
                     <div>
                         <x-ui.label for="v-table-from" value="Dari tanggal" />
@@ -308,10 +308,7 @@
                     <div class="col-span-2 lg:col-span-1">
                         <x-ui.label for="v-table-status" value="Status" />
                         <select id="v-table-status" name="status" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none">
-                            <option value="">Semua status</option>
-                            <option value="ok" @selected($table['filters']['status'] === 'ok')>Aman - Basah</option>
-                            <option value="dry" @selected($table['filters']['status'] === 'dry')>Tanah kering</option>
-                            <option value="empty" @selected($table['filters']['status'] === 'empty')>Air Habis</option>
+                            <x-sensor-status-options :selected="$table['filters']['status']" />
                         </select>
                     </div>
                     <div class="col-span-2 flex items-end gap-2 lg:col-span-1">
@@ -505,7 +502,7 @@
 
                 /* ---------- Live cards ---------- */
 
-                const { pumpState, pumpModeLabel, soilTemperatureLevel, buzzerReason } = window.SensorStream;
+                const { pumpState, pumpModeLabel, matchesStatus, soilTemperatureLevel, buzzerReason } = window.SensorStream;
 
 
                 const renderLatest = (d) => {
@@ -752,8 +749,6 @@
                     }
                 };
 
-                const conditionOf = (d) => (d.is_water_empty ? 'empty' : d.is_soil_dry ? 'dry' : 'ok');
-
                 /**
                  * A live MQTT reading joins the first page when it matches the active filter.
                  */
@@ -762,7 +757,7 @@
                     const matchesFilter = !tableFilters.q
                         && (!tableFilters.date_to || tableFilters.date_to >= today)
                         && (!tableFilters.date_from || tableFilters.date_from <= today)
-                        && (!tableFilters.status || tableFilters.status === conditionOf(row));
+                        && matchesStatus(row, tableFilters.status);
 
                     if (table.meta.current_page !== 1 || !matchesFilter) {
                         return;

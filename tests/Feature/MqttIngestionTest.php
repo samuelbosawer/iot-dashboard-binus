@@ -113,6 +113,40 @@ test('firmware without is_soil_dry and soil_temperature_valid is stored with der
     'wet soil with failed ds18b20 sent as 0' => [['soil_percent' => 60, 'soil_temperature' => 0], false, null],
 ]);
 
+test('a firmware v4 message stores the alarm and derives dry soil from the 55% limit without light sensor data', function (int $soilPercent, bool $isSoilDry) {
+    $reading = ingestMqttMessage(json_encode([
+        'soil_percent' => $soilPercent,
+        'soil_raw' => 2100,
+        'soil_temperature' => null,
+        'temperature' => null,
+        'humidity' => null,
+        'water_level_status' => 'OK',
+        'is_water_empty' => false,
+        'pump_status' => 'OFF',
+        'pump_command' => 'auto',
+        'status' => 'TUNGGU',
+        'light_raw' => 812,
+        'light_percent' => 19,
+        'is_dark' => true,
+        'led_d2' => 'ON',
+        'alarm' => true,
+    ]));
+
+    expect($reading->only(['is_soil_dry', 'soil_temperature', 'buzzer_alarm', 'pump_status', 'lampu1_d25', 'lampu2_d14']))
+        ->toBe([
+            'is_soil_dry' => $isSoilDry,
+            'soil_temperature' => null,
+            'buzzer_alarm' => true,
+            'pump_status' => false,
+            'lampu1_d25' => false,
+            'lampu2_d14' => false,
+        ])
+        ->and($reading->getAttributes())->not->toHaveKeys(['light_raw', 'light_percent', 'is_dark', 'led_d2', 'alarm', 'status']);
+})->with([
+    'below the limit' => [54, true],
+    'at the limit' => [55, false],
+]);
+
 test('invalid messages are rejected and nothing is stored', function (string $message, string $exception) {
     expect(fn () => ingestMqttMessage($message))->toThrow($exception);
 

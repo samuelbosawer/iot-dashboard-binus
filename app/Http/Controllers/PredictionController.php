@@ -28,7 +28,7 @@ class PredictionController extends Controller
     private const PROJECTION_HOURS = 6;
 
     /** Same threshold as the ESP32 firmware: below this the soil is dry and the pump waters. */
-    private const SOIL_DRY_PERCENT = 35;
+    private const SOIL_DRY_PERCENT = 55;
 
     private const OFFLINE_AFTER_MINUTES = 10;
 
@@ -287,7 +287,7 @@ class PredictionController extends Controller
         } elseif ($latest->pump_status) {
             $items[] = ['icon' => 'fa-faucet-drip', 'tone' => 'brand', 'title' => 'Penyiraman sedang berjalan', 'text' => "Kelembaban tanah {$latest->soil_percent}%. Pastikan selang tidak tersumbat dan air mengalir ke tanaman."];
         } elseif ($latest->is_soil_dry && ! $latest->is_water_empty) {
-            $items[] = ['icon' => 'fa-hourglass-half', 'tone' => 'brand', 'title' => 'Menunggu jadwal siram', 'text' => "Tanah kering ({$latest->soil_percent}%, di bawah ".self::SOIL_DRY_PERCENT.'%). Mode otomatis menyiram 8 detik paling sering sekali tiap 2 jam.'];
+            $items[] = ['icon' => 'fa-hourglass-half', 'tone' => 'brand', 'title' => 'Menunggu jadwal siram', 'text' => "Tanah kering ({$latest->soil_percent}%, di bawah ".self::SOIL_DRY_PERCENT.'%). Mode otomatis menyiram 8 detik paling sering sekali tiap 30 menit.'];
         }
 
         if ($trend['hours_until_dry'] !== null && $trend['hours_until_dry'] <= 12) {

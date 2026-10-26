@@ -37,7 +37,7 @@ test('the prediction chart uses real hourly data and projects the soil trend', f
     $this->travelTo(now()->setTime(12, 30));
 
     foreach ([5, 4, 3, 2, 1, 0] as $index => $hoursAgo) {
-        SensorData::factory()->create(['soil_percent' => 70 - $index * 5, 'created_at' => now()->subHours($hoursAgo)]);
+        SensorData::factory()->create(['soil_percent' => 90 - $index * 5, 'created_at' => now()->subHours($hoursAgo)]);
     }
 
     $response = $this->get(route('prediction'))->assertOk();
@@ -45,7 +45,7 @@ test('the prediction chart uses real hourly data and projects the soil trend', f
     $hourly = $response->viewData('hourly');
 
     expect($hourly)->toHaveCount(48)
-        ->and(end($hourly)['avg_soil'])->toBe(45.0)
+        ->and(end($hourly)['avg_soil'])->toBe(65.0)
         ->and($trend['available'])->toBeTrue()
         ->and($trend['slope'])->toBe(-5.0)
         ->and($trend['hours_until_dry'])->toBe(2.0)

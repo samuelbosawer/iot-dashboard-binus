@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\SensorStatusFilter;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class FilterSensorDataRequest extends FormRequest
 {
@@ -25,7 +27,7 @@ class FilterSensorDataRequest extends FormRequest
         return [
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
-            'status' => ['nullable', 'in:ok,dry,empty'],
+            'status' => ['nullable', Rule::enum(SensorStatusFilter::class)],
             'q' => ['nullable', 'string', 'max:50'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
         ];

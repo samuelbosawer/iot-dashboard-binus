@@ -15,7 +15,7 @@ class SensorReadingIngestor
     /**
      * Soil moisture below this percentage counts as dry (firmware BATAS_KERING).
      */
-    private const SOIL_DRY_PERCENT = 35;
+    private const SOIL_DRY_PERCENT = 55;
 
     /**
      * Decode, normalise, validate and store one sensor message.
@@ -41,16 +41,21 @@ class SensorReadingIngestor
      * - relay_d23 is the real pump state ("pump_status" is sent as "ON"/"OFF"),
      * - lamp D25 lights while the pump runs and lamp D14 when the tank is empty,
      * - a failed DHT read is sent as 0 °C / 0 % and stored as "no reading" (DHT is stored but not shown),
-     * - a failed DS18B20 read is flagged by soil_temperature_valid = false, or sent as 0 °C by firmware
-     *   without that flag, and stored as "no reading",
+     * - a failed DS18B20 read is sent as null (firmware v4), flagged by soil_temperature_valid = false,
+     *   or sent as 0 °C by firmware without that flag, and stored as "no reading",
      * - is_soil_dry is derived from soil_percent (firmware BATAS_KERING) when the firmware does not send it,
-     * - buzzer_alarm (firmware v3) is kept as sent, or left empty for older firmware.
+     * - the buzzer state is sent as "alarm" (firmware v4) or "buzzer_alarm" (firmware v3), or left empty for older firmware,
+     * - light sensor fields (light_raw, light_percent, is_dark, led_d2) are not stored.
      *
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     public function normalize(array $payload): array
     {
+        if (! array_key_exists('buzzer_alarm', $payload) && array_key_exists('alarm', $payload)) {
+            $payload['buzzer_alarm'] = $payload['alarm'];
+        }
+
         if ((float) ($payload['temperature'] ?? 0) === 0.0 && (float) ($payload['humidity'] ?? 0) === 0.0) {
             $payload['temperature'] = null;
             $payload['humidity'] = null;

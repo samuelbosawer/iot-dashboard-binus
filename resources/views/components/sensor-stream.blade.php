@@ -7,7 +7,10 @@
 <script>
     window.SensorStream = (() => {
         const CONFIG = @json($streamConfig);
-        const SOIL_DRY_PERCENT = 35;
+        {{-- Firmware BATAS_KERING, BATAS_ALARM_KERING and SUHU_TANAH_MAX. --}}
+        const SOIL_DRY_PERCENT = 55;
+        const SOIL_ALARM_PERCENT = 40;
+        const SOIL_HOT_CELSIUS = 32;
         const MONTHS =['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const pad = (value) => String(value).padStart(2, '0');
         const toBoolean = (value) => value === true || value === 1 || value === '1' || value === 'ON' || value === 'true';
@@ -36,7 +39,7 @@
                 pump_command: payload.pump_command ?? null,
                 lampu1_d25: 'lampu1_d25' in payload ? toBoolean(payload.lampu1_d25) : pump,
                 lampu2_d14: 'lampu2_d14' in payload ? toBoolean(payload.lampu2_d14) : isWaterEmpty,
-                buzzer_alarm: 'buzzer_alarm' in payload ? toBoolean(payload.buzzer_alarm) : null,
+                buzzer_alarm: 'buzzer_alarm' in payload ? toBoolean(payload.buzzer_alarm) : 'alarm' in payload ? toBoolean(payload.alarm) : null,
                 created_at: receivedAt.toISOString(),
                 created_at_label: pad(receivedAt.getDate()) + ' ' + MONTHS[receivedAt.getMonth()] + ' ' + receivedAt.getFullYear() + ' ' + time,
                 time_label: time,
@@ -44,12 +47,12 @@
         };
 
         const PUMP_STATES = {
-            manual_on: { label: 'Manual ON', text: 'Pompa dinyalakan manual dari dashboard dan terus menyala sampai diganti.', icon: 'fa-hand-pointer', badge: 'bg-emerald-100 text-emerald-700', solid: 'bg-emerald-500 text-white' },
+            manual_on: { label: 'Manual ON', text: 'Pompa dinyalakan manual dari dashboard, mati sendiri setelah 60 detik lalu kembali Otomatis.', icon: 'fa-hand-pointer', badge: 'bg-emerald-100 text-emerald-700', solid: 'bg-emerald-500 text-white' },
             manual_on_empty: { label: 'Manual ON', text: 'Pompa menyala manual padahal air tandon habis. Pompa bisa rusak, matikan segera!', icon: 'fa-triangle-exclamation', badge: 'bg-red-100 text-red-700', solid: 'bg-red-500 text-white' },
             manual_off: { label: 'Manual OFF', text: 'Pompa dimatikan manual, penyiraman otomatis tidak berjalan.', icon: 'fa-ban', badge: 'bg-slate-200 text-slate-700', solid: 'bg-slate-500 text-white' },
-            watering: { label: 'Menyiram', text: 'Penyiraman otomatis sedang berjalan (±8 detik).', icon: 'fa-faucet-drip', badge: 'bg-emerald-100 text-emerald-700', solid: 'bg-emerald-500 text-white' },
+            watering: { label: 'Menyiram', text: 'Penyiraman otomatis sedang berjalan (maks. 8 detik, berhenti lebih awal jika tanah ≥ 75%).', icon: 'fa-faucet-drip', badge: 'bg-emerald-100 text-emerald-700', solid: 'bg-emerald-500 text-white' },
             empty: { label: 'Air Habis', text: 'Air tandon habis, pompa dikunci OFF sampai tandon diisi.', icon: 'fa-triangle-exclamation', badge: 'bg-red-100 text-red-700', solid: 'bg-red-500 text-white' },
-            waiting: { label: 'Kering - Tunggu Jeda', text: 'Tanah kering, menunggu jadwal siram berikutnya (maks. sekali tiap 2 jam).', icon: 'fa-hourglass-half', badge: 'bg-amber-100 text-amber-700', solid: 'bg-amber-400 text-white' },
+            waiting: { label: 'Kering - Tunggu Jeda', text: 'Tanah kering, menunggu jadwal siram berikutnya (maks. sekali tiap 30 menit agar air meresap).', icon: 'fa-hourglass-half', badge: 'bg-amber-100 text-amber-700', solid: 'bg-amber-400 text-white' },
             ok: { label: 'Aman - Basah', text: 'Tanah cukup basah dan air tersedia, pompa standby.', icon: 'fa-circle-check', badge: 'bg-sky-100 text-sky-700', solid: 'bg-emerald-500 text-white' },
         };
 
@@ -68,6 +71,21 @@
             return { key, ...PUMP_STATES[key] };
         };
 
+        /** Whether a reading has a "Status" filter value. Mirrors App\Enums\SensorStatusFilter::apply(). */
+        const STATUS_FILTERS = {
+            ok: (d) => !d.is_water_empty && !d.is_soil_dry,
+            dry: (d) => !d.is_water_empty && d.is_soil_dry,
+            empty: (d) => d.is_water_empty,
+            watering: (d) => pumpState(d).key === 'watering',
+            waiting: (d) => pumpState(d).key === 'waiting',
+            manual_on: (d) => d.pump_command === 'pump_on',
+            manual_off: (d) => d.pump_command === 'pump_off',
+            auto: (d) => d.pump_command === 'auto',
+            alarm: (d) => d.buzzer_alarm === true,
+            no_soil_temperature: (d) => d.soil_temperature === null || d.soil_temperature === undefined,
+        };
+        const matchesStatus = (d, status) => !status || (STATUS_FILTERS[status]?.(d) ?? false);
+
         /** Soil temperature bands for shallots (bawang merah). */
         const SOIL_TEMPERATURE_LEVELS = [
             { max: 20, label: 'Dingin', badge: 'bg-brand-100 text-brand-700' },
@@ -77,11 +95,16 @@
         ];
         const soilTemperatureLevel = (value) => SOIL_TEMPERATURE_LEVELS.find((level) => value <= level.max);
 
-        /** Why the firmware sounds the buzzer: tank empty OR soil dry. */
-        const buzzerReason = (d) => d.is_water_empty && d.is_soil_dry ? 'Air habis & tanah kering'
-            : d.is_water_empty ? 'Air tandon habis'
-            : d.is_soil_dry ? 'Tanah kering'
-            : null;
+        /** Why the firmware sounds the buzzer: tank empty OR soil very dry OR soil too hot. */
+        const buzzerReason = (d) => {
+            const reasons = [
+                d.is_water_empty && 'air tandon habis',
+                d.soil_percent < SOIL_ALARM_PERCENT && 'tanah sangat kering (< ' + SOIL_ALARM_PERCENT + '%)',
+                d.soil_temperature !== null && d.soil_temperature !== undefined && d.soil_temperature > SOIL_HOT_CELSIUS && 'suhu tanah panas (> ' + SOIL_HOT_CELSIUS + ' °C)',
+            ].filter(Boolean);
+
+            return reasons.length ? reasons.join(' & ').replace(/^./, (letter) => letter.toUpperCase()) : null;
+        };
 
         const PUMP_MODES = { auto: 'Otomatis', pump_on: 'Manual ON', pump_off: 'Manual OFF' };
         const pumpModeLabel = (command) => PUMP_MODES[command] ?? command ?? '--';
@@ -124,6 +147,6 @@
             return client;
         };
 
-        return { connect, normalize, pumpState, pumpModeLabel, soilTemperatureLevel, buzzerReason };
+        return { connect, normalize, pumpState, pumpModeLabel, matchesStatus, soilTemperatureLevel, buzzerReason };
     })();
 </script>
