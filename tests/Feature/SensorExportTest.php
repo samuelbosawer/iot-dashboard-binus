@@ -37,13 +37,12 @@ test('csv only contains the selected datasets within the date range, oldest firs
 
     $rows = csvRows($response->streamedContent());
 
-    expect($rows[0])->toBe(['id', 'waktu', 'soil_percent', 'soil_raw', 'tanah_kering', 'status'])
+    expect($rows[0])->toBe(['timestamp', 'soil_percent', 'soil_raw', 'status'])
         ->and($rows)->toHaveCount(3)
-        ->and($rows[1][1])->toBe('2026-10-02 09:30:00')
-        ->and($rows[1][2])->toBe('22')
-        ->and($rows[2][2])->toBe('15')
-        ->and($rows[2][4])->toBe('1')
-        ->and($rows[2][5])->toBe('Menyiram');
+        ->and($rows[1][0])->toBe('2026-10-02T02:30:00Z')
+        ->and($rows[1][1])->toBe('22')
+        ->and($rows[2][1])->toBe('15')
+        ->and($rows[2][3])->toBe('MULAI AUTO');
 });
 
 test('csv can be filtered by status and keeps the canonical column order', function () {
@@ -51,14 +50,14 @@ test('csv can be filtered by status and keeps the canonical column order', funct
     SensorData::factory()->waterEmpty()->create();
 
     $response = $this->actingAs(User::factory()->create())
-        ->get(route('sensor.export', ['datasets' => ['lamp_d14', 'water'], 'status' => 'empty']))
+        ->get(route('sensor.export', ['datasets' => ['buzzer', 'water'], 'status' => 'empty']))
         ->assertOk();
 
     $rows = csvRows($response->streamedContent());
 
-    expect($rows[0])->toBe(['id', 'waktu', 'status_air', 'air_habis', 'lampu_d14'])
+    expect($rows[0])->toBe(['timestamp', 'is_water_empty', 'alarm'])
         ->and($rows)->toHaveCount(2)
-        ->and(array_slice($rows[1], 2))->toBe(['Habis', '1', '1']);
+        ->and(array_slice($rows[1], 1))->toBe(['true', 'true']);
 });
 
 test('export requires at least one valid dataset and a valid date range', function () {
@@ -98,9 +97,9 @@ test('csv can include soil temperature and buzzer alarm', function () {
 
     $rows = csvRows($response->streamedContent());
 
-    expect($rows[0])->toBe(['id', 'waktu', 'suhu_tanah_c', 'alarm_buzzer'])
-        ->and(array_slice($rows[1], 2))->toBe(['28.5', '1'])
-        ->and(array_slice($rows[2], 2))->toBe(['', '']);
+    expect($rows[0])->toBe(['timestamp', 'soil_temperature', 'alarm'])
+        ->and(array_slice($rows[1], 1))->toBe(['28.5', 'true'])
+        ->and(array_slice($rows[2], 1))->toBe(['', '']);
 });
 
 test('dht air temperature and humidity can no longer be exported', function () {
@@ -120,7 +119,7 @@ test('the status column reports what the pump really did, not just a dry soil', 
     'wet soil' => [['pump_command' => 'auto'], 'Aman - Basah'],
 ]);
 
-test('the pump csv dataset includes the pump mode', function () {
+test('the pump csv dataset includes the pump status and command', function () {
     SensorData::factory()->create(['pump_status' => true, 'pump_command' => 'pump_on']);
     SensorData::factory()->create(['pump_command' => null]);
 
@@ -130,7 +129,32 @@ test('the pump csv dataset includes the pump mode', function () {
 
     $rows = csvRows($response->streamedContent());
 
-    expect($rows[0])->toBe(['id', 'waktu', 'pompa_d23', 'mode_pompa'])
-        ->and(array_slice($rows[1], 2))->toBe(['1', 'Manual ON'])
-        ->and(array_slice($rows[2], 2))->toBe(['0', '']);
+    expect($rows[0])->toBe(['timestamp', 'pump_status', 'pump_command'])
+        ->and(array_slice($rows[1], 1))->toBe(['ON', 'pump_on'])
+        ->and(array_slice($rows[2], 1))->toBe(['OFF', '']);
+});
+
+test('a full csv follows the dataset structure', function () {
+    $response = $this->actingAs(User::factory()->create())
+        ->get(route('sensor.export', ['datasets' => ['buzzer', 'status', 'pump', 'water', 'soil_temperature', 'soil']]))
+        ->assertOk();
+
+    expect(csvRows($response->streamedContent())[0])->toBe([
+        'timestamp', 'soil_percent', 'soil_raw', 'soil_temperature', 'is_water_empty', 'pump_status', 'pump_command', 'status', 'alarm',
+    ]);
+});
+
+test('the status column names the automation step like the firmware', function () {
+    SensorData::factory()->soilDry()->create(['pump_status' => false]);
+    SensorData::factory()->soilDry()->create(['pump_status' => true]);
+    SensorData::factory()->soilDry()->create(['pump_status' => true]);
+    SensorData::factory()->soilDry()->create(['pump_status' => false]);
+    SensorData::factory()->create();
+
+    $response = $this->actingAs(User::factory()->create())
+        ->get(route('sensor.export', ['datasets' => ['status']]))
+        ->assertOk();
+
+    expect(array_column(array_slice(csvRows($response->streamedContent()), 1), 1))
+        ->toBe(['TUNGGU', 'MULAI AUTO', 'AUTO SIRAM', 'SELESAI', 'LEMBAB AMAN']);
 });

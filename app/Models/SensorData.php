@@ -197,6 +197,26 @@ class SensorData extends Model
     }
 
     /**
+     * The automation step as the ESP32 firmware names it ("stat" in iot_penyiram_binus.ino), e.g. "MULAI AUTO"
+     * or "SELESAI". The firmware does not publish it, so it is rebuilt from this reading and the one before it:
+     * an auto watering run starts when the pump switches on and is finished when it switches off again.
+     */
+    public function automationStatus(?self $previous = null): string
+    {
+        $wasPumping = (bool) $previous?->pump_status;
+
+        return match (true) {
+            $this->pump_command === PumpCommand::On->value => 'MANUAL ON',
+            $this->pump_command === PumpCommand::Off->value => 'MANUAL OFF',
+            $this->pump_status => $wasPumping ? 'AUTO SIRAM' : 'MULAI AUTO',
+            $wasPumping => 'SELESAI',
+            $this->is_water_empty => 'AIR HABIS',
+            $this->is_soil_dry => 'TUNGGU',
+            default => 'LEMBAB AMAN',
+        };
+    }
+
+    /**
      * Pump mode reported by the firmware, e.g. "Otomatis"; null for readings stored before MQTT.
      */
     public function pumpModeLabel(): ?string

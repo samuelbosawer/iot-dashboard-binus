@@ -385,7 +385,7 @@
                 @endif
 
                 <form id="v-export-form" method="GET" action="{{ route('visitor.export') }}" class="relative">
-                    <div class="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+                    <div class="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
                         @foreach ($datasets as $dataset)
                             <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 transition hover:bg-slate-50 has-checked:border-emerald-400 has-checked:bg-emerald-50/60">
                                 <input type="checkbox" name="datasets[]" value="{{ $dataset->value }}" class="mt-0.5 h-4 w-4 accent-emerald-600"

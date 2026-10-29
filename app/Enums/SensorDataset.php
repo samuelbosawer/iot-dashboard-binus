@@ -6,18 +6,18 @@ use App\Models\SensorData;
 
 /**
  * The groups of columns a user can pick when downloading the sensor dataset as CSV.
- * DHT11 air temperature / humidity are still stored but intentionally not offered here.
+ * The cases are ordered so the columns follow the published dataset structure:
+ * timestamp, soil_percent, soil_raw, soil_temperature, is_water_empty, pump_status, pump_command, status, alarm.
+ * DHT11 air temperature / humidity and the indicator lamps are still stored but intentionally not offered here.
  */
 enum SensorDataset: string
 {
     case Soil = 'soil';
-    case Water = 'water';
     case SoilTemperature = 'soil_temperature';
+    case Water = 'water';
     case Pump = 'pump';
-    case LampD25 = 'lamp_d25';
-    case LampD14 = 'lamp_d14';
-    case Buzzer = 'buzzer';
     case Status = 'status';
+    case Buzzer = 'buzzer';
 
     /**
      * Public name of the dataset (without ESP32 pins, safe for the visitor site).
@@ -26,13 +26,11 @@ enum SensorDataset: string
     {
         return match ($this) {
             self::Soil => 'Kelembaban Tanah',
-            self::Water => 'Float Switch Air Tandon',
             self::SoilTemperature => 'Suhu Tanah',
+            self::Water => 'Float Switch Air Tandon',
             self::Pump => 'Pompa Air',
-            self::LampD25 => 'Lampu Indikator 1',
-            self::LampD14 => 'Lampu Indikator 2',
+            self::Status => 'Status Otomasi',
             self::Buzzer => 'Alarm Buzzer',
-            self::Status => 'Status Sistem',
         };
     }
 
@@ -43,11 +41,9 @@ enum SensorDataset: string
     {
         return match ($this) {
             self::Soil => 'D34',
-            self::Water => 'D15',
             self::SoilTemperature => 'D26',
+            self::Water => 'D15',
             self::Pump => 'D23',
-            self::LampD25 => 'D25',
-            self::LampD14 => 'D14',
             self::Buzzer => 'D13',
             self::Status => null,
         };
@@ -55,22 +51,14 @@ enum SensorDataset: string
 
     public function description(): string
     {
-        return match ($this) {
-            self::Soil => 'soil_percent, soil_raw, tanah_kering',
-            self::Water => 'status_air, air_habis',
-            self::SoilTemperature => 'suhu_tanah_c',
-            self::Pump => 'pompa_d23, mode_pompa',
-            self::LampD25 => 'lampu_d25',
-            self::LampD14 => 'lampu_d14',
-            self::Buzzer => 'alarm_buzzer',
-            self::Status => 'status',
-        };
+        return implode(', ', array_keys($this->columns()));
     }
 
     /**
-     * CSV columns of this dataset, keyed by header, each resolving its value from a reading.
+     * CSV columns of this dataset, keyed by header, each resolving its value from a reading
+     * and the reading stored just before it (needed to tell "MULAI AUTO" / "SELESAI" apart).
      *
-     * @return array<string, callable(SensorData): (int|float|string|null)>
+     * @return array<string, callable(SensorData, ?SensorData): (int|float|string|null)>
      */
     public function columns(): array
     {
@@ -78,31 +66,31 @@ enum SensorDataset: string
             self::Soil => [
                 'soil_percent' => fn (SensorData $reading): int => $reading->soil_percent,
                 'soil_raw' => fn (SensorData $reading): int => $reading->soil_raw,
-                'tanah_kering' => fn (SensorData $reading): int => (int) $reading->is_soil_dry,
-            ],
-            self::Water => [
-                'status_air' => fn (SensorData $reading): string => $reading->is_water_empty ? 'Habis' : 'Ada',
-                'air_habis' => fn (SensorData $reading): int => (int) $reading->is_water_empty,
             ],
             self::SoilTemperature => [
-                'suhu_tanah_c' => fn (SensorData $reading): ?float => $reading->soil_temperature,
+                'soil_temperature' => fn (SensorData $reading): ?float => $reading->soil_temperature,
+            ],
+            self::Water => [
+                'is_water_empty' => fn (SensorData $reading): string => self::boolean($reading->is_water_empty),
             ],
             self::Pump => [
-                'pompa_d23' => fn (SensorData $reading): int => (int) $reading->pump_status,
-                'mode_pompa' => fn (SensorData $reading): ?string => $reading->pumpModeLabel(),
-            ],
-            self::LampD25 => [
-                'lampu_d25' => fn (SensorData $reading): int => (int) $reading->lampu1_d25,
-            ],
-            self::LampD14 => [
-                'lampu_d14' => fn (SensorData $reading): int => (int) $reading->lampu2_d14,
-            ],
-            self::Buzzer => [
-                'alarm_buzzer' => fn (SensorData $reading): ?int => $reading->buzzer_alarm === null ? null : (int) $reading->buzzer_alarm,
+                'pump_status' => fn (SensorData $reading): string => $reading->pump_status ? 'ON' : 'OFF',
+                'pump_command' => fn (SensorData $reading): ?string => $reading->pump_command,
             ],
             self::Status => [
-                'status' => fn (SensorData $reading): string => $reading->statusLabel(),
+                'status' => fn (SensorData $reading, ?SensorData $previous): string => $reading->automationStatus($previous),
+            ],
+            self::Buzzer => [
+                'alarm' => fn (SensorData $reading): ?string => $reading->buzzer_alarm === null ? null : self::boolean($reading->buzzer_alarm),
             ],
         };
+    }
+
+    /**
+     * Booleans are written as "true" / "false", like the InfluxDB export.
+     */
+    private static function boolean(bool $value): string
+    {
+        return $value ? 'true' : 'false';
     }
 }

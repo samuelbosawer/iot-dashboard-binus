@@ -25,14 +25,17 @@ class SensorExportController extends Controller
 
             // UTF-8 BOM so Excel opens the file with the right encoding.
             fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, ['id', 'waktu', ...array_keys($columns)]);
+            fputcsv($handle, ['timestamp', ...array_keys($columns)]);
 
-            $query->lazyById(1000)->each(function (SensorData $reading) use ($handle, $columns): void {
+            $previous = null;
+
+            $query->lazyById(1000)->each(function (SensorData $reading) use ($handle, $columns, &$previous): void {
                 fputcsv($handle, [
-                    $reading->id,
-                    $reading->created_at?->format('Y-m-d H:i:s'),
-                    ...array_map(fn (callable $value): int|float|string|null => $value($reading), array_values($columns)),
+                    $reading->created_at?->copy()->utc()->toIso8601ZuluString(),
+                    ...array_map(fn (callable $value): int|float|string|null => $value($reading, $previous), array_values($columns)),
                 ]);
+
+                $previous = $reading;
             });
 
             fclose($handle);

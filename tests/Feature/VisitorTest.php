@@ -67,9 +67,9 @@ test('guests can download the csv from the visitor page', function () {
 
     $rows = csvRows($response->streamedContent());
 
-    expect($rows[0])->toBe(['id', 'waktu', 'soil_percent', 'soil_raw', 'tanah_kering', 'suhu_tanah_c'])
-        ->and($rows[1][2])->toBe('55')
-        ->and($rows[1][5])->toBe('27.5');
+    expect($rows[0])->toBe(['timestamp', 'soil_percent', 'soil_raw', 'soil_temperature'])
+        ->and($rows[1][1])->toBe('55')
+        ->and($rows[1][3])->toBe('27.5');
 });
 
 test('visitor csv downloads are rate limited', function () {

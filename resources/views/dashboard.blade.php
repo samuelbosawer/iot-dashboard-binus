@@ -157,7 +157,7 @@
     </div>
 
     {{-- Row 2b: DS18B20 soil temperature + buzzer alarm --}}
-    <div id="suhu-tanah" class="mb-4 grid scroll-mt-6 grid-cols-1 gap-4 md:grid-cols-2">
+    <div id="suhu-tanah" class="mb-4 grid scroll-mt-24 grid-cols-1 gap-4 md:grid-cols-2">
         <x-ui.card>
             <div class="flex items-start justify-between gap-3">
                 <div class="flex items-center gap-3">
@@ -288,7 +288,7 @@
                 <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><i class="fa-solid fa-file-csv text-lg"></i></span>
                 <div>
                     <h2 class="text-lg font-semibold text-slate-900">Download Dataset CSV</h2>
-                    <p class="text-xs text-slate-400">Pilih data sensor dan rentang tanggal sesuai kebutuhan. Kolom <span class="font-mono">id</span> &amp; <span class="font-mono">waktu</span> selalu disertakan.</p>
+                    <p class="text-xs text-slate-400">Pilih data sensor dan rentang tanggal sesuai kebutuhan. Kolom <span class="font-mono">timestamp</span> (UTC) selalu disertakan.</p>
                 </div>
             </div>
             <div class="flex flex-wrap gap-2 text-xs font-semibold" id="export-quick-dates">
